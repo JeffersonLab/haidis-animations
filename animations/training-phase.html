@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAIDIS Training Phase</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #e8eef6; overflow: hidden; }
+  body { display: flex; justify-content: center; align-items: center; }
+  svg { width: 100vw; height: 100vh; max-width: 177.78vh; max-height: 56.25vw; }
+</style>
+</head>
+<body>
+
+<svg id="scene" viewBox="0 0 1440 810" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <!-- Drop-shadow filters — look clean on light backgrounds -->
+  <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#0099cc" flood-opacity="0.55"/>
+  </filter>
+  <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#e05820" flood-opacity="0.55"/>
+  </filter>
+  <filter id="glow-purple" x="-60%" y="-60%" width="220%" height="220%">
+    <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#9922cc" flood-opacity="0.5"/>
+  </filter>
+  <filter id="glow-gold" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#b88000" flood-opacity="0.25"/>
+  </filter>
+  <filter id="shadow-node" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#2a4060" flood-opacity="0.12"/>
+  </filter>
+  <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#18b068" flood-opacity="0.6"/>
+  </filter>
+
+  <!-- Light radial background gradient -->
+  <radialGradient id="bg-grad" cx="50%" cy="50%" r="70%">
+    <stop offset="0%"   stop-color="#f2f6fc"/>
+    <stop offset="100%" stop-color="#e4eaf4"/>
+  </radialGradient>
+</defs>
+
+<!-- ── Background ── -->
+<rect width="1440" height="810" fill="url(#bg-grad)"/>
+<g opacity="0.3" stroke="#a8bdd4" stroke-width="0.5">
+  <line x1="0" y1="80"  x2="1440" y2="80"/>  <line x1="0" y1="160" x2="1440" y2="160"/>
+  <line x1="0" y1="240" x2="1440" y2="240"/>  <line x1="0" y1="320" x2="1440" y2="320"/>
+  <line x1="0" y1="400" x2="1440" y2="400"/>  <line x1="0" y1="480" x2="1440" y2="480"/>
+  <line x1="0" y1="560" x2="1440" y2="560"/>  <line x1="0" y1="640" x2="1440" y2="640"/>
+  <line x1="0" y1="720" x2="1440" y2="720"/>  <line x1="0" y1="800" x2="1440" y2="800"/>
+  <line x1="160"  y1="0" x2="160"  y2="810"/>  <line x1="320"  y1="0" x2="320"  y2="810"/>
+  <line x1="480"  y1="0" x2="480"  y2="810"/>  <line x1="640"  y1="0" x2="640"  y2="810"/>
+  <line x1="800"  y1="0" x2="800"  y2="810"/>  <line x1="960"  y1="0" x2="960"  y2="810"/>
+  <line x1="1120" y1="0" x2="1120" y2="810"/>  <line x1="1280" y1="0" x2="1280" y2="810"/>
+  <line x1="1440" y1="0" x2="1440" y2="810"/>
+</g>
+
+<!-- ── Title ── -->
+<text x="640" y="34" text-anchor="middle" fill="#4a6080"
+      font-family="'Courier New', monospace" font-size="13" letter-spacing="3" font-weight="bold">
+  HAIDIS Training Phase
+</text>
+
+<!-- ══════════════════════════════════════
+     DATA LINKS  (drawn before nodes)
+     ══════════════════════════════════════ -->
+
+<!-- Sender → LB -->
+<line x1="204" y1="210" x2="488" y2="325" stroke="#8aaac8" stroke-width="2"/>
+<line x1="204" y1="510" x2="488" y2="395" stroke="#8aaac8" stroke-width="2"/>
+
+<!-- LB → Worker (5 fan-out lines) -->
+<line id="link-lb-r1" x1="792" y1="290" x2="1076" y2="93"  stroke="#8aaac8" stroke-width="2"/>
+<line id="link-lb-r2" x1="792" y1="325" x2="1076" y2="227" stroke="#8aaac8" stroke-width="2"/>
+<line id="link-lb-r3" x1="792" y1="360" x2="1076" y2="360" stroke="#8aaac8" stroke-width="2"/>
+<line id="link-lb-r4" x1="792" y1="395" x2="1076" y2="493" stroke="#8aaac8" stroke-width="2"/>
+<line id="link-lb-r5" x1="792" y1="430" x2="1076" y2="627" stroke="#8aaac8" stroke-width="2"/>
+
+<!-- Worker → LB ready/feedback signals (dashed) -->
+<line x1="1076" y1="78"  x2="792" y2="275" stroke="#a8c0d8" stroke-width="1.5" stroke-dasharray="6,5"/>
+<line x1="1076" y1="212" x2="792" y2="310" stroke="#a8c0d8" stroke-width="1.5" stroke-dasharray="6,5"/>
+<line x1="1076" y1="345" x2="792" y2="345" stroke="#a8c0d8" stroke-width="1.5" stroke-dasharray="6,5"/>
+<line x1="1076" y1="479" x2="792" y2="380" stroke="#a8c0d8" stroke-width="1.5" stroke-dasharray="6,5"/>
+<line x1="1076" y1="613" x2="792" y2="415" stroke="#a8c0d8" stroke-width="1.5" stroke-dasharray="6,5"/>
+
+<!-- ══════════════════════════════════════
+     RING TOPOLOGY
+     Worker right-centers: (1216, 93/227/360/493/627)
+     ══════════════════════════════════════ -->
+
+<path d="M 1216,93  C 1262,93  1262,227 1216,227" fill="none" stroke="#9933bb" stroke-width="1.8" opacity="0.6"/>
+<path d="M 1216,227 C 1262,227 1262,360 1216,360" fill="none" stroke="#9933bb" stroke-width="1.8" opacity="0.6"/>
+<path d="M 1216,360 C 1262,360 1262,493 1216,493" fill="none" stroke="#9933bb" stroke-width="1.8" opacity="0.6"/>
+<path d="M 1216,493 C 1262,493 1262,627 1216,627" fill="none" stroke="#9933bb" stroke-width="1.8" opacity="0.6"/>
+<path d="M 1216,627 C 1265,660 1265,60  1216,93"  fill="none" stroke="#9933bb" stroke-width="1.8" opacity="0.3"
+      stroke-dasharray="5,4"/>
+
+<!-- Tick marks at ring connection points -->
+<g stroke="#7722aa" stroke-width="1.2" opacity="0.6">
+  <line x1="1216" y1="93"  x2="1221" y2="87"/>   <line x1="1216" y1="93"  x2="1221" y2="99"/>
+  <line x1="1216" y1="227" x2="1221" y2="221"/>  <line x1="1216" y1="227" x2="1221" y2="233"/>
+  <line x1="1216" y1="360" x2="1221" y2="354"/>  <line x1="1216" y1="360" x2="1221" y2="366"/>
+  <line x1="1216" y1="493" x2="1221" y2="487"/>  <line x1="1216" y1="493" x2="1221" y2="499"/>
+  <line x1="1216" y1="627" x2="1221" y2="621"/>  <line x1="1216" y1="627" x2="1221" y2="633"/>
+</g>
+
+<!-- Ring label -->
+<text transform="rotate(-90, 1270, 360)" x="1270" y="360"
+      text-anchor="middle" fill="#7722aa"
+      font-family="'Courier New', monospace" font-size="8" letter-spacing="2" opacity="0.7">
+  MODEL WEIGHTS
+</text>
+
+
+<!-- ══════════════════════════════════════
+     SENDER NODES
+     S1 center (134, 210)  box top y=178
+     S2 center (134, 510)  box top y=478
+     ══════════════════════════════════════ -->
+
+<g id="node-s1" filter="url(#shadow-node)">
+  <rect x="64" y="178" width="140" height="64" rx="6" fill="#ffffff" stroke="#0099cc" stroke-width="1.5"/>
+  <rect x="64" y="178" width="5"   height="64" rx="3" fill="#0099cc"/>
+  <text x="144" y="198" text-anchor="middle" fill="#006890"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">GLUEX DATA 1</text>
+  <text x="144" y="213" text-anchor="middle" fill="#3a7090"
+        font-family="'Courier New', monospace" font-size="9">10.0.1.10 : 19522</text>
+  <text x="144" y="228" text-anchor="middle" fill="#5a8090"
+        font-family="'Courier New', monospace" font-size="8.5">UDP  ·  10 Gb/s</text>
+  <text x="144" y="237" text-anchor="middle" fill="#7a9098"
+        font-family="'Courier New', monospace" font-size="8">2048-byte frames</text>
+</g>
+
+<g id="node-s2" filter="url(#shadow-node)">
+  <rect x="64" y="478" width="140" height="64" rx="6" fill="#ffffff" stroke="#e05820" stroke-width="1.5"/>
+  <rect x="64" y="478" width="5"   height="64" rx="3" fill="#e05820"/>
+  <text x="144" y="498" text-anchor="middle" fill="#b03808"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">GLUEX DATA 2</text>
+  <text x="144" y="513" text-anchor="middle" fill="#885040"
+        font-family="'Courier New', monospace" font-size="9">10.0.1.11 : 19522</text>
+  <text x="144" y="528" text-anchor="middle" fill="#906050"
+        font-family="'Courier New', monospace" font-size="8.5">UDP  ·  10 Gb/s</text>
+  <text x="144" y="537" text-anchor="middle" fill="#a07060"
+        font-family="'Courier New', monospace" font-size="8">2048-byte frames</text>
+</g>
+
+
+<!-- ══════════════════════════════════════
+     LOAD BALANCER
+     Box: x=488, y=250, width=304, height=220
+     ══════════════════════════════════════ -->
+
+<g id="node-lb" filter="url(#shadow-node)">
+  <rect x="488" y="250" width="304" height="220" rx="10" fill="#fffef5" stroke="#c89000" stroke-width="2"/>
+  <rect x="488" y="250" width="304" height="5"   rx="3"  fill="#c89000"/>
+
+  <text x="640" y="276" text-anchor="middle" fill="#9a7000"
+        font-family="'Courier New', monospace" font-size="12" font-weight="bold" letter-spacing="2">LOAD BALANCER</text>
+  <text x="640" y="291" text-anchor="middle" fill="#b08030"
+        font-family="'Courier New', monospace" font-size="9.5">EJFAT  ·  FPGA</text>
+
+  <line x1="506" y1="299" x2="774" y2="299" stroke="#e0d8b8" stroke-width="1"/>
+
+  <!-- Packet counters -->
+  <text x="510" y="314" fill="#8090a8" font-family="'Courier New', monospace" font-size="9">PKT IN</text>
+  <text id="lb-pkt-in"  x="556" y="314" fill="#007aaa" font-family="'Courier New', monospace" font-size="9">0</text>
+  <text x="620" y="314" fill="#8090a8" font-family="'Courier New', monospace" font-size="9">PKT OUT</text>
+  <text id="lb-pkt-out" x="669" y="314" fill="#007840" font-family="'Courier New', monospace" font-size="9">0</text>
+
+  <line x1="506" y1="322" x2="774" y2="322" stroke="#e8e0c8" stroke-width="0.75"/>
+
+  <!-- Distribution bars (5 workers) -->
+  <text x="510" y="336" fill="#9090a0" font-family="'Courier New', monospace" font-size="8.5" letter-spacing="1">DISTRIBUTION</text>
+
+  <text x="510" y="350" fill="#8090a8" font-family="'Courier New', monospace" font-size="8">W1</text>
+  <rect x="526" y="341" width="240" height="7" rx="3" fill="#dde8f4"/>
+  <rect id="dist-r1" x="526" y="341" width="0" height="7" rx="3" fill="#4a7ab0"/>
+
+  <text x="510" y="363" fill="#8090a8" font-family="'Courier New', monospace" font-size="8">W2</text>
+  <rect x="526" y="354" width="240" height="7" rx="3" fill="#dde8f4"/>
+  <rect id="dist-r2" x="526" y="354" width="0" height="7" rx="3" fill="#4a7ab0"/>
+
+  <text x="510" y="376" fill="#8090a8" font-family="'Courier New', monospace" font-size="8">W3</text>
+  <rect x="526" y="367" width="240" height="7" rx="3" fill="#dde8f4"/>
+  <rect id="dist-r3" x="526" y="367" width="0" height="7" rx="3" fill="#4a7ab0"/>
+
+  <text x="510" y="389" fill="#8090a8" font-family="'Courier New', monospace" font-size="8">W4</text>
+  <rect x="526" y="380" width="240" height="7" rx="3" fill="#dde8f4"/>
+  <rect id="dist-r4" x="526" y="380" width="0" height="7" rx="3" fill="#4a7ab0"/>
+
+  <text x="510" y="402" fill="#8090a8" font-family="'Courier New', monospace" font-size="8">W5</text>
+  <rect x="526" y="393" width="240" height="7" rx="3" fill="#dde8f4"/>
+  <rect id="dist-r5" x="526" y="393" width="0" height="7" rx="3" fill="#4a7ab0"/>
+
+  <line x1="506" y1="411" x2="774" y2="411" stroke="#e8e0c8" stroke-width="0.75"/>
+
+  <text x="640" y="425" text-anchor="middle" fill="#9090a0"
+        font-family="'Courier New', monospace" font-size="8.5" letter-spacing="1">ALGO: ROUND-ROBIN + BACKPRESSURE</text>
+
+  <circle id="lb-status-dot" cx="510" cy="444" r="4" fill="#00aa55"/>
+  <text x="520" y="448" fill="#409060" font-family="'Courier New', monospace" font-size="8.5">ACTIVE</text>
+</g>
+
+
+<!-- ══════════════════════════════════════
+     WORKER NODES  (5 workers)
+     Box: x=1076, width=140, height=80
+     Centers y: 93, 227, 360, 493, 627
+     Box tops:  53, 187, 320, 453, 587
+     ══════════════════════════════════════ -->
+
+<!-- W1  top=53  center=93 -->
+<g id="node-r1" filter="url(#shadow-node)">
+  <rect x="1076" y="53"  width="140" height="80" rx="6" fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+  <rect x="1076" y="53"  width="5"   height="80" rx="3" fill="#4a70a0"/>
+  <text x="1146" y="73"  text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">WORKER 1</text>
+  <text x="1146" y="87"  text-anchor="middle" fill="#3a5878"
+        font-family="'Courier New', monospace" font-size="9">ERSAP + SAGIPS</text>
+  <text x="1146" y="101" text-anchor="middle" fill="#5a7890"
+        font-family="'Courier New', monospace" font-size="8.5">10.0.2.10 : 19530</text>
+  <text x="1091" y="118" fill="#8090a8" font-family="'Courier New', monospace" font-size="7.5">QUEUE</text>
+  <rect x="1118" y="110" width="76" height="8" rx="3" fill="#dde8f4"/>
+  <rect id="buf-r1" x="1118" y="110" width="0" height="8" rx="3" fill="#4a7ab0"/>
+  <text id="buf-r1-pct" x="1207" y="118" text-anchor="end" fill="#8090a8"
+        font-family="'Courier New', monospace" font-size="7">0%</text>
+</g>
+
+<!-- W2  top=187  center=227 -->
+<g id="node-r2" filter="url(#shadow-node)">
+  <rect x="1076" y="187" width="140" height="80" rx="6" fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+  <rect x="1076" y="187" width="5"   height="80" rx="3" fill="#4a70a0"/>
+  <text x="1146" y="207" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">WORKER 2</text>
+  <text x="1146" y="221" text-anchor="middle" fill="#3a5878"
+        font-family="'Courier New', monospace" font-size="9">ERSAP + SAGIPS</text>
+  <text x="1146" y="235" text-anchor="middle" fill="#5a7890"
+        font-family="'Courier New', monospace" font-size="8.5">10.0.2.11 : 19530</text>
+  <text x="1091" y="252" fill="#8090a8" font-family="'Courier New', monospace" font-size="7.5">QUEUE</text>
+  <rect x="1118" y="244" width="76" height="8" rx="3" fill="#dde8f4"/>
+  <rect id="buf-r2" x="1118" y="244" width="0" height="8" rx="3" fill="#4a7ab0"/>
+  <text id="buf-r2-pct" x="1207" y="252" text-anchor="end" fill="#8090a8"
+        font-family="'Courier New', monospace" font-size="7">0%</text>
+</g>
+
+<!-- W3  top=320  center=360 -->
+<g id="node-r3" filter="url(#shadow-node)">
+  <rect x="1076" y="320" width="140" height="80" rx="6" fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+  <rect x="1076" y="320" width="5"   height="80" rx="3" fill="#4a70a0"/>
+  <text x="1146" y="340" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">WORKER 3</text>
+  <text x="1146" y="354" text-anchor="middle" fill="#3a5878"
+        font-family="'Courier New', monospace" font-size="9">ERSAP + SAGIPS</text>
+  <text x="1146" y="368" text-anchor="middle" fill="#5a7890"
+        font-family="'Courier New', monospace" font-size="8.5">10.0.2.12 : 19530</text>
+  <text x="1091" y="385" fill="#8090a8" font-family="'Courier New', monospace" font-size="7.5">QUEUE</text>
+  <rect x="1118" y="377" width="76" height="8" rx="3" fill="#dde8f4"/>
+  <rect id="buf-r3" x="1118" y="377" width="0" height="8" rx="3" fill="#4a7ab0"/>
+  <text id="buf-r3-pct" x="1207" y="385" text-anchor="end" fill="#8090a8"
+        font-family="'Courier New', monospace" font-size="7">0%</text>
+</g>
+
+<!-- W4  top=453  center=493 -->
+<g id="node-r4" filter="url(#shadow-node)">
+  <rect x="1076" y="453" width="140" height="80" rx="6" fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+  <rect x="1076" y="453" width="5"   height="80" rx="3" fill="#4a70a0"/>
+  <text x="1146" y="473" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">WORKER 4</text>
+  <text x="1146" y="487" text-anchor="middle" fill="#3a5878"
+        font-family="'Courier New', monospace" font-size="9">ERSAP + SAGIPS</text>
+  <text x="1146" y="501" text-anchor="middle" fill="#5a7890"
+        font-family="'Courier New', monospace" font-size="8.5">10.0.2.13 : 19530</text>
+  <text x="1091" y="518" fill="#8090a8" font-family="'Courier New', monospace" font-size="7.5">QUEUE</text>
+  <rect x="1118" y="510" width="76" height="8" rx="3" fill="#dde8f4"/>
+  <rect id="buf-r4" x="1118" y="510" width="0" height="8" rx="3" fill="#4a7ab0"/>
+  <text id="buf-r4-pct" x="1207" y="518" text-anchor="end" fill="#8090a8"
+        font-family="'Courier New', monospace" font-size="7">0%</text>
+</g>
+
+<!-- W5  top=587  center=627 -->
+<g id="node-r5" filter="url(#shadow-node)">
+  <rect x="1076" y="587" width="140" height="80" rx="6" fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+  <rect x="1076" y="587" width="5"   height="80" rx="3" fill="#4a70a0"/>
+  <text x="1146" y="607" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="1">WORKER 5</text>
+  <text x="1146" y="621" text-anchor="middle" fill="#3a5878"
+        font-family="'Courier New', monospace" font-size="9">ERSAP + SAGIPS</text>
+  <text x="1146" y="635" text-anchor="middle" fill="#5a7890"
+        font-family="'Courier New', monospace" font-size="8.5">10.0.2.14 : 19530</text>
+  <text x="1091" y="652" fill="#8090a8" font-family="'Courier New', monospace" font-size="7.5">QUEUE</text>
+  <rect x="1118" y="644" width="76" height="8" rx="3" fill="#dde8f4"/>
+  <rect id="buf-r5" x="1118" y="644" width="0" height="8" rx="3" fill="#4a7ab0"/>
+  <text id="buf-r5-pct" x="1207" y="652" text-anchor="end" fill="#8090a8"
+        font-family="'Courier New', monospace" font-size="7">0%</text>
+</g>
+
+
+<!-- ══════════════════════════════════════
+     WORKER → MLFLOW SAVE PATHS
+     Worker right-centers → MLFlow left (1295, 400)
+     ══════════════════════════════════════ -->
+<g stroke="#1ab870" stroke-width="1.3" stroke-dasharray="5,5" opacity="0.4" fill="none">
+  <line x1="1216" y1="93"  x2="1295" y2="400"/>
+  <line x1="1216" y1="227" x2="1295" y2="400"/>
+  <line x1="1216" y1="360" x2="1295" y2="400"/>
+  <line x1="1216" y1="493" x2="1295" y2="400"/>
+  <line x1="1216" y1="627" x2="1295" y2="400"/>
+</g>
+
+<!-- ══════════════════════════════════════
+     MLFLOW MODEL REGISTRY
+     Box: x=1295, y=330, w=130, h=145
+     Center: (1360, 402)
+     ══════════════════════════════════════ -->
+<g id="node-mlflow" filter="url(#shadow-node)">
+  <rect x="1295" y="330" width="130" height="145" rx="8"
+        fill="#f4fff9" stroke="#1a9060" stroke-width="1.8"/>
+  <rect x="1295" y="330" width="130" height="5" rx="3" fill="#1a9060"/>
+
+  <text x="1360" y="353" text-anchor="middle" fill="#1a5040"
+        font-family="'Courier New', monospace" font-size="10" font-weight="bold" letter-spacing="0.5">AmSC MLFlow</text>
+  <text x="1360" y="366" text-anchor="middle" fill="#3a7058"
+        font-family="'Courier New', monospace" font-size="8.5">Model Registry</text>
+
+  <line x1="1308" y1="373" x2="1412" y2="373" stroke="#b8e8d0" stroke-width="0.75"/>
+
+  <!-- Database cylinder (stacked ellipses) -->
+  <ellipse cx="1360" cy="392" rx="28" ry="8"
+           fill="#e4f8ee" stroke="#1a9060" stroke-width="1.2"/>
+  <!-- Sides -->
+  <line x1="1332" y1="392" x2="1332" y2="418" stroke="#1a9060" stroke-width="1.2"/>
+  <line x1="1388" y1="392" x2="1388" y2="418" stroke="#1a9060" stroke-width="1.2"/>
+  <!-- Layer stripes -->
+  <ellipse cx="1360" cy="403" rx="28" ry="8"
+           fill="none" stroke="#60c898" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.6"/>
+  <ellipse cx="1360" cy="411" rx="28" ry="8"
+           fill="none" stroke="#60c898" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.35"/>
+  <!-- Bottom -->
+  <ellipse cx="1360" cy="418" rx="28" ry="8"
+           fill="#caf0dc" stroke="#1a9060" stroke-width="1.2"/>
+
+  <line x1="1308" y1="434" x2="1412" y2="434" stroke="#b8e8d0" stroke-width="0.75"/>
+
+  <text x="1308" y="448" fill="#4a8068" font-family="'Courier New', monospace" font-size="8">VERSION</text>
+  <text id="mlflow-version" x="1418" y="448" text-anchor="end" fill="#1a6040"
+        font-family="'Courier New', monospace" font-size="9" font-weight="bold">v0</text>
+
+  <text x="1308" y="463" fill="#4a8068" font-family="'Courier New', monospace" font-size="8">SAVES</text>
+  <text id="mlflow-saves" x="1418" y="463" text-anchor="end" fill="#1a6040"
+        font-family="'Courier New', monospace" font-size="9" font-weight="bold">0</text>
+</g>
+
+<!-- ── Packets layer (always on top) ── -->
+<g id="packets"></g>
+
+
+<!-- ── Legend (3 rows) ── -->
+<g transform="translate(36, 730)">
+  <rect x="0" y="-14" width="400" height="82" rx="5" fill="#ffffff" stroke="#c8d8e8" stroke-width="1"
+        filter="url(#shadow-node)"/>
+
+  <!-- Row 1: data senders -->
+  <rect x="10" y="0"  width="22" height="9" rx="2" fill="#0099cc"/>
+  <text x="38" y="9"  fill="#4a6080" font-size="9" font-family="'Courier New', monospace">GlueX Data 1</text>
+  <rect x="170" y="0" width="22" height="9" rx="2" fill="#e05820"/>
+  <text x="198" y="9" fill="#4a6080" font-size="9" font-family="'Courier New', monospace">GlueX Data 2</text>
+
+  <!-- Row 2: ring weights + ready signal -->
+  <polygon points="18,25 25,30 18,35 11,30" fill="#aa33dd"/>
+  <text x="32" y="34"  fill="#4a6080" font-size="9" font-family="'Courier New', monospace">Model weights (ring)</text>
+  <line x1="210" y1="30" x2="228" y2="30" stroke="#7090a8" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <circle cx="219" cy="30" r="3" fill="none" stroke="#7090a8" stroke-width="1.2"/>
+  <text x="234" y="34" fill="#4a6080" font-size="9" font-family="'Courier New', monospace">Ready signal</text>
+
+  <!-- Row 3: ring arc label + model snapshot -->
+  <path d="M 11,48 C 23,48 23,58 11,58" fill="none" stroke="#9933bb" stroke-width="1.8"/>
+  <text x="32" y="57"  fill="#4a6080" font-size="9" font-family="'Courier New', monospace">MPI Rank communications</text>
+  <g transform="translate(248, 53)">
+    <polygon points="-5,-6 3,-6 6,-3 6,6 -5,6" fill="#18b068"/>
+    <polyline points="3,-6 3,-3 6,-3" fill="none" stroke="#f0fff4" stroke-width="0.8"/>
+  </g>
+  <line x1="256" y1="57" x2="266" y2="57" stroke="#1ab870" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.6"/>
+  <text x="272" y="57" fill="#4a6080" font-size="9" font-family="'Courier New', monospace">Model snapshot → registry</text>
+</g>
+
+<!-- ── Frame timer ── -->
+<text id="frame-counter" x="1404" y="800" text-anchor="end" fill="#8090a8"
+      font-size="9" font-family="'Courier New', monospace">t=0.0s</text>
+
+</svg>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+'use strict';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const SENDERS = {
+  s1: { color: '#0099cc', glowFilter: 'glow-cyan'   },
+  s2: { color: '#e05820', glowFilter: 'glow-orange' },
+};
+
+const LINKS = {
+  's1-lb': { x1: 204, y1: 210, x2: 488, y2: 325 },
+  's2-lb': { x1: 204, y1: 510, x2: 488, y2: 395 },
+  'lb-r1': { x1: 792, y1: 290, x2: 1076, y2:  93 },
+  'lb-r2': { x1: 792, y1: 325, x2: 1076, y2: 227 },
+  'lb-r3': { x1: 792, y1: 360, x2: 1076, y2: 360 },
+  'lb-r4': { x1: 792, y1: 395, x2: 1076, y2: 493 },
+  'lb-r5': { x1: 792, y1: 430, x2: 1076, y2: 627 },
+};
+
+const FEEDBACK_LINKS = [
+  { x1: 1076, y1:  78, x2: 792, y2: 275 },
+  { x1: 1076, y1: 212, x2: 792, y2: 310 },
+  { x1: 1076, y1: 345, x2: 792, y2: 345 },
+  { x1: 1076, y1: 479, x2: 792, y2: 380 },
+  { x1: 1076, y1: 613, x2: 792, y2: 415 },
+];
+
+const BUFS = {
+  r1: { barEl: null, pctEl: null, level: 0, maxW: 76 },
+  r2: { barEl: null, pctEl: null, level: 0, maxW: 76 },
+  r3: { barEl: null, pctEl: null, level: 0, maxW: 76 },
+  r4: { barEl: null, pctEl: null, level: 0, maxW: 76 },
+  r5: { barEl: null, pctEl: null, level: 0, maxW: 76 },
+};
+
+const packetsLayer = document.getElementById('packets');
+
+let pktIn = 0, pktOut = 0;
+const distCounts = { r1: 0, r2: 0, r3: 0, r4: 0, r5: 0 };
+let startTime = null;
+
+const ROUTING = {
+  s1: ['r1', 'r2', 'r3', 'r4', 'r5'],
+  s2: ['r3', 'r4', 'r5', 'r1', 'r2'],
+};
+const routingIdx = { s1: 0, s2: 0 };
+function getNextReceiver(sid) {
+  const list = ROUTING[sid];
+  return list[(routingIdx[sid]++) % list.length];
+}
+
+// ─────────────────────────────────────────────────────
+//  Data-packet helpers
+// ─────────────────────────────────────────────────────
+const PKT_W = 14, PKT_H = 9;
+const TRAVEL_SPEED = 280;
+
+function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+function dur(x1, y1, x2, y2)  { return dist(x1, y1, x2, y2) / TRAVEL_SPEED; }
+
+function makeDataPkt(cx, cy, color, filter) {
+  const g = document.createElementNS(SVG_NS, 'g');
+
+  // Soft halo behind the packet (lighter on light BG)
+  const glow = document.createElementNS(SVG_NS, 'rect');
+  Object.entries({
+    width: PKT_W + 8, height: PKT_H + 8, rx: 4,
+    x: cx - PKT_W / 2 - 4, y: cy - PKT_H / 2 - 4,
+    fill: color, opacity: 0.25,
+  }).forEach(([k, v]) => glow.setAttribute(k, v));
+  g.appendChild(glow);
+
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  Object.entries({
+    width: PKT_W, height: PKT_H, rx: 2,
+    x: cx - PKT_W / 2, y: cy - PKT_H / 2,
+    fill: color, opacity: 1,
+    filter: `url(#${filter})`,
+  }).forEach(([k, v]) => rect.setAttribute(k, v));
+  g.appendChild(rect);
+
+  packetsLayer.appendChild(g);
+  return { g, rect, glow };
+}
+
+function movePkt(p, cx, cy) {
+  p.rect.setAttribute('x', cx - PKT_W / 2);
+  p.rect.setAttribute('y', cy - PKT_H / 2);
+  p.glow.setAttribute('x', cx - PKT_W / 2 - 4);
+  p.glow.setAttribute('y', cy - PKT_H / 2 - 4);
+}
+
+function animateJourney(sid, rid, delay) {
+  const s = LINKS[`${sid}-lb`];
+  const d = LINKS[`lb-${rid}`];
+  const { color, glowFilter } = SENDERS[sid];
+  const dur1 = dur(s.x1, s.y1, s.x2, s.y2);
+  const dur2 = dur(d.x1, d.y1, d.x2, d.y2);
+
+  gsap.delayedCall(delay, () => {
+    const p = makeDataPkt(s.x1, s.y1, color, glowFilter);
+
+    gsap.to(p.rect, { attr: { x: s.x2 - PKT_W/2, y: s.y2 - PKT_H/2 }, duration: dur1, ease: 'none' });
+    gsap.to(p.glow, {
+      attr: { x: s.x2 - PKT_W/2 - 4, y: s.y2 - PKT_H/2 - 4 }, duration: dur1, ease: 'none',
+      onComplete() {
+        pktIn++;
+        updateLBStats();
+        flashLB();
+        movePkt(p, d.x1, d.y1);
+
+        gsap.to(p.rect, { attr: { x: d.x2 - PKT_W/2, y: d.y2 - PKT_H/2 }, duration: dur2, ease: 'none' });
+        gsap.to(p.glow, {
+          attr: { x: d.x2 - PKT_W/2 - 4, y: d.y2 - PKT_H/2 - 4 }, duration: dur2, ease: 'none',
+          onComplete() {
+            pktOut++;
+            distCounts[rid]++;
+            updateLBStats();
+            fillBuffer(rid, 9 + Math.random() * 5);
+            flashWorker(rid);
+            p.g.remove();
+          },
+        });
+      },
+    });
+  });
+}
+
+function spawnTrain(sid) {
+  const n   = 5 + Math.floor(Math.random() * 5);
+  const rid = getNextReceiver(sid);
+  for (let i = 0; i < n; i++) animateJourney(sid, rid, i * 0.11);
+}
+
+function scheduleSender(sid, firstDelay, interval) {
+  const go = (d) => gsap.delayedCall(d, () => {
+    spawnTrain(sid);
+    go(interval + (Math.random() - 0.5) * 0.3);
+  });
+  go(firstDelay);
+}
+
+// ─────────────────────────────────────────────────────
+//  LB display
+// ─────────────────────────────────────────────────────
+function updateLBStats() {
+  document.getElementById('lb-pkt-in').textContent  = pktIn;
+  document.getElementById('lb-pkt-out').textContent = pktOut;
+  const total = Object.values(distCounts).reduce((a, b) => a + b, 0);
+  if (total === 0) return;
+  ['r1','r2','r3','r4','r5'].forEach(r => {
+    const w = Math.round((distCounts[r] / total) * 240);
+    gsap.to(document.getElementById(`dist-${r}`), { attr: { width: w }, duration: 0.6, ease: 'power2.out' });
+  });
+}
+
+let lbBusy = false;
+function flashLB() {
+  if (lbBusy) return;
+  lbBusy = true;
+  const dot = document.getElementById('lb-status-dot');
+  gsap.to(dot, { attr: { r: 6 }, fill: '#44cc88', duration: 0.08,
+    onComplete: () => gsap.to(dot, { attr: { r: 4 }, fill: '#00aa55', duration: 0.18,
+      onComplete: () => { lbBusy = false; } }) });
+}
+
+// ─────────────────────────────────────────────────────
+//  Worker buffer bars
+// ─────────────────────────────────────────────────────
+function fillBuffer(rid, delta) {
+  const b = BUFS[rid];
+  b.level = Math.min(b.level + delta, 100);
+  renderBuf(rid);
+}
+
+function drainBuffers() {
+  Object.keys(BUFS).forEach(rid => {
+    const b = BUFS[rid];
+    if (b.level <= 0) return;
+    b.level = Math.max(0, b.level - 1.6);
+    renderBuf(rid);
+  });
+}
+
+function renderBuf(rid) {
+  const b = BUFS[rid];
+  const w = Math.round((b.level / 100) * b.maxW);
+  const c = b.level > 80 ? '#cc2020' : b.level > 50 ? '#d07010' : '#4a7ab0';
+  gsap.to(b.barEl, { attr: { width: w }, duration: 0.25, ease: 'power1.out' });
+  b.barEl.setAttribute('fill', c);
+  b.pctEl.textContent = Math.round(b.level) + '%';
+  b.pctEl.setAttribute('fill', c);
+}
+
+function flashWorker(rid) {
+  const box = document.querySelector(`#node-${rid} rect`);
+  const orig = box.getAttribute('stroke');
+  gsap.to(box, { attr: { stroke: '#0099cc' }, duration: 0.06,
+    onComplete: () => gsap.to(box, { attr: { stroke: orig }, duration: 0.25 }) });
+}
+
+// ─────────────────────────────────────────────────────
+//  Feedback signals
+// ─────────────────────────────────────────────────────
+function schedFeedback(link, delay) {
+  gsap.delayedCall(delay, () => {
+    const c = document.createElementNS(SVG_NS, 'circle');
+    Object.entries({ r: 4, cx: link.x1, cy: link.y1,
+      fill: 'none', stroke: '#6090b8', 'stroke-width': 1.5, opacity: 0.75 })
+      .forEach(([k, v]) => c.setAttribute(k, v));
+    packetsLayer.appendChild(c);
+    const d = dist(link.x1, link.y1, link.x2, link.y2) / (TRAVEL_SPEED * 0.75);
+    gsap.to(c, { attr: { cx: link.x2, cy: link.y2 }, duration: d, ease: 'none',
+      onComplete: () => c.remove() });
+    schedFeedback(link, 1.2 + Math.random() * 0.9);
+  });
+}
+
+// ─────────────────────────────────────────────────────
+//  Ring animation (model-weight diamonds)
+// ─────────────────────────────────────────────────────
+const RING_SEGS = [
+  { p0:{x:1216,y: 93}, p1:{x:1262,y: 93}, p2:{x:1262,y:227}, p3:{x:1216,y:227} },
+  { p0:{x:1216,y:227}, p1:{x:1262,y:227}, p2:{x:1262,y:360}, p3:{x:1216,y:360} },
+  { p0:{x:1216,y:360}, p1:{x:1262,y:360}, p2:{x:1262,y:493}, p3:{x:1216,y:493} },
+  { p0:{x:1216,y:493}, p1:{x:1262,y:493}, p2:{x:1262,y:627}, p3:{x:1216,y:627} },
+  { p0:{x:1216,y:627}, p1:{x:1265,y:660}, p2:{x:1265,y: 60}, p3:{x:1216,y: 93} },
+];
+
+function cubicBez(t, p0, p1, p2, p3) {
+  const mt = 1 - t, mt2 = mt * mt, mt3 = mt2 * mt;
+  const t2 = t * t,  t3 = t2 * t;
+  return {
+    x: mt3*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t3*p3.x,
+    y: mt3*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t3*p3.y,
+  };
+}
+
+function ringPos(ringT) {
+  const n = RING_SEGS.length;
+  const w = ((ringT % n) + n) % n;
+  const seg = RING_SEGS[Math.floor(w)];
+  return cubicBez(w - Math.floor(w), seg.p0, seg.p1, seg.p2, seg.p3);
+}
+
+const RING_DURATION = 5.0;
+const RING_COLOR    = '#aa33dd';
+const NUM_RING_PKTS = 4;
+const DIAM_S        = 11;
+
+function makeRingDiamond() {
+  const g = document.createElementNS(SVG_NS, 'g');
+
+  const glow = document.createElementNS(SVG_NS, 'rect');
+  const gs = DIAM_S + 8;
+  Object.entries({
+    width: gs, height: gs, x: -gs/2, y: -gs/2, rx: 2,
+    fill: RING_COLOR, opacity: 0.2, transform: 'rotate(45)',
+  }).forEach(([k, v]) => glow.setAttribute(k, v));
+  g.appendChild(glow);
+
+  const body = document.createElementNS(SVG_NS, 'rect');
+  Object.entries({
+    width: DIAM_S, height: DIAM_S, x: -DIAM_S/2, y: -DIAM_S/2, rx: 1.5,
+    fill: RING_COLOR, opacity: 1,
+    transform: 'rotate(45)', filter: 'url(#glow-purple)',
+  }).forEach(([k, v]) => body.setAttribute(k, v));
+  g.appendChild(body);
+
+  g.setAttribute('transform', 'translate(1216, 93)');
+  packetsLayer.appendChild(g);
+  return g;
+}
+
+function startRing() {
+  for (let i = 0; i < NUM_RING_PKTS; i++) {
+    const diamond = makeRingDiamond();
+    const state = { t: (i / NUM_RING_PKTS) * RING_SEGS.length };
+    gsap.to(state, {
+      t: state.t + RING_SEGS.length,
+      duration: RING_DURATION,
+      ease: 'none',
+      repeat: -1,
+      onUpdate() {
+        const { x, y } = ringPos(state.t);
+        diamond.setAttribute('transform', `translate(${x.toFixed(1)}, ${y.toFixed(1)})`);
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────
+//  MLFlow model-snapshot animation
+// ─────────────────────────────────────────────────────
+const MLFLOW_CX = 1360, MLFLOW_CY = 400;
+const WORKER_SAVE_POINTS = [
+  { x: 1216, y:  93 },
+  { x: 1216, y: 227 },
+  { x: 1216, y: 360 },
+  { x: 1216, y: 493 },
+  { x: 1216, y: 627 },
+];
+let mlflowVersion = 0, mlflowSaves = 0;
+
+function makeSnapshotPkt(wx, wy) {
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${wx}, ${wy})`);
+
+  // Soft halo
+  const halo = document.createElementNS(SVG_NS, 'circle');
+  Object.entries({ r: 11, cx: 0, cy: 0, fill: '#18b068', opacity: 0.15 })
+    .forEach(([k, v]) => halo.setAttribute(k, v));
+  g.appendChild(halo);
+
+  // Page / checkpoint icon (rect with folded corner)
+  const body = document.createElementNS(SVG_NS, 'polygon');
+  body.setAttribute('points', '-5,-6 3,-6 6,-3 6,6 -5,6');
+  body.setAttribute('fill', '#18b068');
+  body.setAttribute('filter', 'url(#glow-green)');
+  g.appendChild(body);
+
+  const fold = document.createElementNS(SVG_NS, 'polyline');
+  fold.setAttribute('points', '3,-6 3,-3 6,-3');
+  fold.setAttribute('fill', 'none');
+  fold.setAttribute('stroke', '#f0fff4');
+  fold.setAttribute('stroke-width', '0.9');
+  g.appendChild(fold);
+
+  // Tiny lines to suggest data rows
+  [[0], [2.5]].forEach(([dy]) => {
+    const l = document.createElementNS(SVG_NS, 'line');
+    Object.entries({ x1: -3, y1: dy, x2: 4, y2: dy,
+      stroke: '#f0fff4', 'stroke-width': 0.65, opacity: 0.7 })
+      .forEach(([k, v]) => l.setAttribute(k, v));
+    g.appendChild(l);
+  });
+
+  packetsLayer.appendChild(g);
+  return g;
+}
+
+function animateSnapshot(workerIdx) {
+  const src = WORKER_SAVE_POINTS[workerIdx];
+  const pkt = makeSnapshotPkt(src.x, src.y);
+
+  // Quadratic bezier control point — arc above/below the direct line
+  const cpx = (src.x + MLFLOW_CX) / 2 + 20;
+  const cpy = (src.y + MLFLOW_CY) / 2 - 30;
+
+  const state = { t: 0 };
+  gsap.to(state, {
+    t: 1,
+    duration: 1.1,
+    ease: 'power1.inOut',
+    onUpdate() {
+      const t = state.t, mt = 1 - t;
+      const x = mt*mt*src.x + 2*mt*t*cpx + t*t*MLFLOW_CX;
+      const y = mt*mt*src.y + 2*mt*t*cpy + t*t*MLFLOW_CY;
+      pkt.setAttribute('transform', `translate(${x.toFixed(1)}, ${y.toFixed(1)})`);
+    },
+    onComplete() {
+      mlflowSaves++;
+      if (mlflowSaves % 3 === 0) mlflowVersion++;
+      document.getElementById('mlflow-saves').textContent   = mlflowSaves;
+      document.getElementById('mlflow-version').textContent = `v${mlflowVersion}`;
+      flashMLFlow();
+      pkt.remove();
+    },
+  });
+}
+
+let mlflowBusy = false;
+function flashMLFlow() {
+  if (mlflowBusy) return;
+  mlflowBusy = true;
+  const box = document.querySelector('#node-mlflow > rect');
+  gsap.to(box, { attr: { stroke: '#40e090' }, duration: 0.1,
+    onComplete: () => gsap.to(box, { attr: { stroke: '#1a9060' }, duration: 0.5,
+      onComplete: () => { mlflowBusy = false; } }) });
+}
+
+function scheduleSnapshots() {
+  // Stagger workers so saves arrive from different nodes over time
+  [0, 1, 2, 3, 4].forEach((wIdx, i) => {
+    const firstDelay = 2.0 + i * 0.7 + Math.random();
+    const go = (delay) => gsap.delayedCall(delay, () => {
+      animateSnapshot(wIdx);
+      go(3.5 + Math.random() * 3.0);
+    });
+    go(firstDelay);
+  });
+}
+
+// ─────────────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────────────
+(function init() {
+  ['r1','r2','r3','r4','r5'].forEach(r => {
+    BUFS[r].barEl = document.getElementById(`buf-${r}`);
+    BUFS[r].pctEl = document.getElementById(`buf-${r}-pct`);
+  });
+
+  scheduleSender('s1', 0.2, 2.0);
+  scheduleSender('s2', 0.9, 2.2);
+  setInterval(drainBuffers, 350);
+  FEEDBACK_LINKS.forEach((lnk, i) => schedFeedback(lnk, 0.5 + i * 0.4));
+  startRing();
+  scheduleSnapshots();
+
+  // Frame timer
+  (function tick() {
+    if (!startTime) startTime = performance.now();
+    document.getElementById('frame-counter').textContent =
+      `t=${((performance.now() - startTime) / 1000).toFixed(1)}s`;
+    requestAnimationFrame(tick);
+  })();
+})();
+</script>
+</body>
+</html>
