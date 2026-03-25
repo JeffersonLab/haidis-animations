@@ -150,6 +150,22 @@ Bottom-left box showing all link types and packet colors. Use the same visual pr
 | Pipeline stages | Raw Detector → Cal & Reco → Intermediate Data → Additional Analysis → AI-Ready |
 | HAIDIS insight | Can train directly on any stage — eliminates upstream processing steps |
 
+## Git workflow
+
+1. **New change request → new feature branch.** For every new change request, create a feature branch from `main` before making any edits:
+   ```bash
+   git checkout main && git pull
+   git checkout -b feature/<short-description>
+   ```
+2. **Confirm completion before committing.** After all edits are done, check with the user that the changes are complete. Once confirmed, stage and commit the relevant files, then push the branch to origin:
+   ```bash
+   git push -u origin feature/<short-description>
+   ```
+3. **Returning to main always pulls from origin.** Whenever switching back to `main`, always follow with a pull:
+   ```bash
+   git checkout main && git pull
+   ```
+
 ## Gallery page (index.html) conventions
 - Grid of `.card` links, `minmax(320px, 1fr)`, max-width 1100px
 - Each card: `.card-thumb` (160px, static SVG preview) + `.card-body` (tag / title / desc / footer)
