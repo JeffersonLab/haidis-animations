@@ -211,16 +211,17 @@
         <text x="267" y="115" text-anchor="middle" fill="#2a4870" font-size="4.5" font-family="'Courier New',monospace">W4</text>
         <text x="267" y="145" text-anchor="middle" fill="#2a4870" font-size="4.5" font-family="'Courier New',monospace">W5</text>
         <!-- Animated data packets -->
-        <rect class="pkt-s1" x="54" y="68" width="8" height="5" rx="1" fill="#0099cc" opacity="0.9">
+        <!-- S1 packet: starts at S1 right edge (46,50), travels to LB left edge (118,75): delta (72,25) -->
+        <rect class="pkt-s1" x="42" y="48" width="8" height="5" rx="1" fill="#0099cc" opacity="0.9">
           <animateTransform attributeName="transform" type="translate"
-            values="0,0; 62,5; 0,0" dur="1.8s" repeatCount="indefinite" begin="0s"/>
+            values="0,0; 72,25; 0,0" dur="1.8s" repeatCount="indefinite" begin="0s"/>
         </rect>
         <rect x="34" y="108" width="8" height="5" rx="1" fill="#e05820" opacity="0.9">
           <animateTransform attributeName="transform" type="translate"
             values="0,0; 72,-18; 0,0" dur="2.1s" repeatCount="indefinite" begin="0.4s"/>
         </rect>
-        <!-- Ring diamond -->
-        <rect x="281" y="58" width="7" height="7" rx="1" fill="#aa33dd" transform="rotate(45,284.5,61.5)" opacity="0.9">
+        <!-- Ring diamond: starts at W1 (center y=22, rect y=19); 30px steps reach W2..W5 then loop -->
+        <rect x="281" y="19" width="7" height="7" rx="1" fill="#aa33dd" transform="rotate(45,284.5,22.5)" opacity="0.9">
           <animateTransform attributeName="transform" type="translate"
             values="0,0; 0,30; 0,60; 0,90; 0,120; 0,0" dur="2.5s" repeatCount="indefinite" calcMode="linear"/>
         </rect>
@@ -240,20 +241,80 @@
     </div>
   </a>
 
-  <!-- ── Placeholder for future animations ── -->
-  <div class="card placeholder">
+  <!-- ── 2. Pipeline Overview ── -->
+  <a class="card" href="animations/pipeline-overview.html">
     <div class="card-thumb">
-      <span class="placeholder-icon">◎</span>
+      <svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg">
+        <!-- BG -->
+        <rect width="320" height="160" fill="#f0f5fb"/>
+        <!-- Grid -->
+        <g stroke="#c0cedc" stroke-width="0.4" opacity="0.5">
+          <line x1="0" y1="53"  x2="320" y2="53"/>
+          <line x1="0" y1="106" x2="320" y2="106"/>
+          <line x1="64"  y1="0" x2="64"  y2="160"/>
+          <line x1="128" y1="0" x2="128" y2="160"/>
+          <line x1="192" y1="0" x2="192" y2="160"/>
+          <line x1="256" y1="0" x2="256" y2="160"/>
+        </g>
+        <!-- Collider ring icon -->
+        <circle cx="14" cy="80" r="10" fill="none" stroke="#cc3344" stroke-width="1.2"/>
+        <circle cx="14" cy="80" r="6"  fill="none" stroke="#cc3344" stroke-width="0.5" opacity="0.4"/>
+        <line x1="4"  y1="80" x2="24" y2="80" stroke="#cc3344" stroke-width="0.8" opacity="0.7"/>
+        <line x1="14" y1="70" x2="14" y2="90" stroke="#cc3344" stroke-width="0.8" opacity="0.7"/>
+        <circle cx="14" cy="80" r="2" fill="#cc3344"/>
+        <!-- Pipeline nodes -->
+        <!-- Raw Detector Data -->
+        <rect x="28" y="70" width="40" height="20" rx="2" fill="#fff" stroke="#cc3344" stroke-width="1"/>
+        <text x="48" y="82" text-anchor="middle" fill="#cc3344" font-size="4" font-family="'Courier New',monospace" font-weight="bold">RAW</text>
+        <!-- Calibration & Reco -->
+        <polygon points="72,70 100,70 106,80 100,90 72,90" fill="#fff3f0" stroke="#e05820" stroke-width="1"/>
+        <text x="89" y="82" text-anchor="middle" fill="#e05820" font-size="3.5" font-family="'Courier New',monospace" font-weight="bold">CAL</text>
+        <!-- Intermediate Data -->
+        <rect x="110" y="70" width="40" height="20" rx="2" fill="#fff" stroke="#c89000" stroke-width="1"/>
+        <text x="130" y="80" text-anchor="middle" fill="#c89000" font-size="3.5" font-family="'Courier New',monospace" font-weight="bold">INT</text>
+        <text x="130" y="87" text-anchor="middle" fill="#c89000" font-size="3" font-family="'Courier New',monospace">DATA</text>
+        <!-- Additional Analysis -->
+        <polygon points="154,70 182,70 188,80 182,90 154,90" fill="#f0f4fb" stroke="#4a70a0" stroke-width="1"/>
+        <text x="171" y="82" text-anchor="middle" fill="#4a70a0" font-size="3.5" font-family="'Courier New',monospace" font-weight="bold">ANAL</text>
+        <!-- AI-Ready -->
+        <rect x="192" y="70" width="40" height="20" rx="2" fill="#f0fbf5" stroke="#1a9060" stroke-width="1"/>
+        <text x="212" y="80" text-anchor="middle" fill="#1a9060" font-size="3.5" font-family="'Courier New',monospace" font-weight="bold">AI</text>
+        <text x="212" y="87" text-anchor="middle" fill="#1a9060" font-size="3" font-family="'Courier New',monospace">READY</text>
+        <!-- Feed line: Phase 1, green, dashed -->
+        <line x1="232" y1="80" x2="248" y2="80" stroke="#1a9060" stroke-width="1" stroke-dasharray="3,2"/>
+        <!-- HAIDIS Training chevron -->
+        <polygon points="248,65 278,65 284,80 278,95 248,95 254,80" fill="#f8f0ff" stroke="#9933bb" stroke-width="1.2"/>
+        <text x="266" y="78" text-anchor="middle" fill="#9933bb" font-size="4" font-family="'Courier New',monospace" font-weight="bold">HAI</text>
+        <text x="266" y="86" text-anchor="middle" fill="#9933bb" font-size="3.5" font-family="'Courier New',monospace">DIS</text>
+        <!-- SAGIPS Model -->
+        <rect x="288" y="68" width="28" height="24" rx="2" fill="#f0f8ff" stroke="#0099cc" stroke-width="1.2"/>
+        <text x="302" y="78" text-anchor="middle" fill="#0099cc" font-size="3.5" font-family="'Courier New',monospace" font-weight="bold">SAG</text>
+        <text x="302" y="85" text-anchor="middle" fill="#0099cc" font-size="3" font-family="'Courier New',monospace">IPS</text>
+        <!-- Arrows between nodes -->
+        <line x1="24" y1="80" x2="27" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <line x1="68" y1="80" x2="71" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <line x1="107" y1="80" x2="109" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <line x1="150" y1="80" x2="153" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <line x1="189" y1="80" x2="191" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <line x1="284" y1="80" x2="287" y2="80" stroke="#8aaac8" stroke-width="0.8"/>
+        <!-- Phase label -->
+        <text x="160" y="130" text-anchor="middle" fill="#7090a8" font-size="6" font-family="'Courier New',monospace" letter-spacing="1">PIPELINE OVERVIEW</text>
+        <text x="160" y="142" text-anchor="middle" fill="#9033bb" font-size="5" font-family="'Courier New',monospace">3-phase training progression</text>
+      </svg>
     </div>
     <div class="card-body">
-      <span class="card-tag">Phase 2</span>
-      <span class="card-title">Coming soon</span>
-      <p class="card-desc">Next animation will appear here.</p>
+      <span class="card-tag">Overview</span>
+      <span class="card-title">HAIDIS Pipeline Overview</span>
+      <p class="card-desc">
+        3-phase training progression · from AI-ready data to intermediate products
+        to raw detector output · HAIDIS shortens the processing pipeline.
+      </p>
       <div class="card-footer">
-        <span class="badge" style="background:#f0f0f0; color:#909090; border-color:#d0d0d0;">PENDING</span>
+        <span class="badge">LIVE</span>
+        <span class="arrow">→</span>
       </div>
     </div>
-  </div>
+  </a>
 
 </main>
 
