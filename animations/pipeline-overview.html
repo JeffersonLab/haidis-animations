@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAIDIS Pipeline Overview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #e8eef6; overflow: hidden; }
+  body { display: flex; justify-content: center; align-items: center; }
+  svg { width: 100vw; height: 100vh; max-width: 177.78vh; max-height: 56.25vw; }
+</style>
+</head>
+<body>
+
+<svg id="scene" viewBox="0 0 1440 810" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <filter id="shadow-node" x="-12%" y="-20%" width="124%" height="140%">
+    <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#2a4060" flood-opacity="0.12"/>
+  </filter>
+  <filter id="blur-glow" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="11"/>
+  </filter>
+  <radialGradient id="bg-grad" cx="50%" cy="50%" r="70%">
+    <stop offset="0%"   stop-color="#f2f6fc"/>
+    <stop offset="100%" stop-color="#e4eaf4"/>
+  </radialGradient>
+  <marker id="arrowhead" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <polygon points="0 0, 7 2.5, 0 5" fill="#8aaac8"/>
+  </marker>
+  <marker id="arrowhead-sm" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+    <polygon points="0 0, 6 2, 0 4" fill="#7090aa"/>
+  </marker>
+</defs>
+
+<!-- ── Background ── -->
+<rect width="1440" height="810" fill="url(#bg-grad)"/>
+<g opacity="0.3" stroke="#a8bdd4" stroke-width="0.5">
+  <line x1="0" y1="80"  x2="1440" y2="80"/>   <line x1="0" y1="160" x2="1440" y2="160"/>
+  <line x1="0" y1="240" x2="1440" y2="240"/>  <line x1="0" y1="320" x2="1440" y2="320"/>
+  <line x1="0" y1="400" x2="1440" y2="400"/>  <line x1="0" y1="480" x2="1440" y2="480"/>
+  <line x1="0" y1="560" x2="1440" y2="560"/>  <line x1="0" y1="640" x2="1440" y2="640"/>
+  <line x1="0" y1="720" x2="1440" y2="720"/>
+  <line x1="160"  y1="0" x2="160"  y2="810"/> <line x1="320"  y1="0" x2="320"  y2="810"/>
+  <line x1="480"  y1="0" x2="480"  y2="810"/> <line x1="640"  y1="0" x2="640"  y2="810"/>
+  <line x1="800"  y1="0" x2="800"  y2="810"/> <line x1="960"  y1="0" x2="960"  y2="810"/>
+  <line x1="1120" y1="0" x2="1120" y2="810"/> <line x1="1280" y1="0" x2="1280" y2="810"/>
+</g>
+
+<!-- ── Title ── -->
+<text x="720" y="36" text-anchor="middle" fill="#4a6080"
+      font-family="'Courier New', monospace" font-size="18" letter-spacing="3" font-weight="bold">
+  HAIDIS — ADAPTIVE TRAINING DATA PIPELINE
+</text>
+<text x="720" y="60" text-anchor="middle" fill="#6a80a0"
+      font-family="'Courier New', monospace" font-size="14" letter-spacing="1.5">
+  HAIDIS trains on any stage of the data processing pipeline — from curated AI-ready data to raw detector output
+</text>
+
+<!-- ══════════════════════════════════════
+     STATIC INTER-NODE ARROWS
+     (drawn before nodes so nodes sit on top)
+     ══════════════════════════════════════ -->
+<g id="static-arrows" fill="none">
+  <!-- collider → raw -->
+  <line id="arrow-col-raw" x1="119" y1="405" x2="127" y2="405"
+        stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <!-- raw → calreco -->
+  <line id="arrow-raw-cal" x1="241" y1="405" x2="264" y2="405"
+        stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <!-- calreco tip → intdata -->
+  <line id="arrow-cal-int" x1="397" y1="405" x2="411" y2="405"
+        stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <!-- intdata → addanal -->
+  <line id="arrow-int-add" x1="526" y1="405" x2="544" y2="405"
+        stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <!-- addanal tip → aiready -->
+  <line id="arrow-add-ai" x1="677" y1="405" x2="690" y2="405"
+        stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <!-- haidis tip → sagips -->
+  <line id="arrow-hai-sag" x1="1116" y1="405" x2="1137" y2="405"
+        stroke="#7090aa" stroke-width="2" marker-end="url(#arrowhead)"/>
+</g>
+
+<!-- ══════════════════════════════════════
+     TRAINING FEED LINE
+     Phase 1 position: x1=814 (AI-Ready right), x2=900 (HAIDIS left)
+     Drawn above pipeline nodes so it overlays faded nodes in later phases
+     ══════════════════════════════════════ -->
+<line id="feed-line" x1="814" y1="405" x2="900" y2="405"
+      stroke="#1a9060" stroke-width="3.5" stroke-dasharray="12,8"
+      stroke-linecap="round" opacity="0.9"/>
+
+<!-- ══════════════════════════════════════
+     PIPELINE NODE GROUPS
+     ══════════════════════════════════════ -->
+
+<!-- ── 0. DAQ / Particle Collider icon ── -->
+<g id="icon-collider" transform="translate(82, 405)">
+  <!-- Accelerator ring -->
+  <circle r="36" fill="none" stroke="#cc3344" stroke-width="2" opacity="0.85"/>
+  <circle r="25" fill="none" stroke="#cc3344" stroke-width="0.8" opacity="0.35"/>
+  <!-- Beam pipes (horizontal + vertical cross) -->
+  <line x1="-36" y1="0"  x2="36"  y2="0"  stroke="#cc3344" stroke-width="1.5" opacity="0.65"/>
+  <line x1="0"   y1="-36" x2="0"  y2="36" stroke="#cc3344" stroke-width="1.5" opacity="0.65"/>
+  <!-- Detector segments (small rects clamped to ring at N/S/E/W) -->
+  <rect x="-4" y="-40" width="8" height="7" rx="1" fill="#cc3344"/>
+  <rect x="-4" y="33"  width="8" height="7" rx="1" fill="#cc3344"/>
+  <rect x="-40" y="-3" width="7" height="6" rx="1" fill="#cc3344"/>
+  <rect x="33"  y="-3" width="7" height="6" rx="1" fill="#cc3344"/>
+  <!-- Collision point -->
+  <circle r="4.5" fill="#cc3344"/>
+  <!-- Collision sparks -->
+  <line x1="0" y1="0" x2="10"  y2="-10" stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
+  <line x1="0" y1="0" x2="-10" y2="-10" stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
+  <line x1="0" y1="0" x2="11"  y2="6"   stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
+  <line x1="0" y1="0" x2="-11" y2="6"   stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
+</g>
+<text x="82" y="462" text-anchor="middle" fill="#992233"
+      font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="1">DAQ / DETECTOR</text>
+
+<!-- ── 1. Raw Detector Data ── -->
+<g id="grp-raw">
+  <rect id="glow-raw" x="126" y="349" width="118" height="112" rx="10"
+        fill="#cc3344" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <rect x="130" y="355" width="110" height="100" rx="8"
+          fill="#ffffff" stroke="#cc3344" stroke-width="1.5"/>
+    <rect x="130" y="355" width="5"   height="100" rx="2" fill="#cc3344"/>
+  </g>
+  <text x="187" y="381" text-anchor="middle" fill="#aa2233"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="0.5">RAW DETECTOR</text>
+  <text x="187" y="395" text-anchor="middle" fill="#aa2233"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="0.5">DATA</text>
+  <text x="187" y="413" text-anchor="middle" fill="#cc5566"
+        font-family="'Courier New', monospace" font-size="10">≈10 Gb/s</text>
+  <text x="187" y="427" text-anchor="middle" fill="#cc5566"
+        font-family="'Courier New', monospace" font-size="10">unfiltered</text>
+</g>
+
+<!-- ── 2. Calibration & Reconstruction ── -->
+<g id="grp-calreco">
+  <rect id="glow-calreco" x="262" y="349" width="139" height="112" rx="6"
+        fill="#e05820" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <polygon points="268,355 378,355 396,405 378,455 268,455"
+             fill="#ffffff" stroke="#e05820" stroke-width="1.5"/>
+    <!-- Left accent bar (chevron has flat left edge) -->
+    <rect x="268" y="355" width="5" height="100" fill="#e05820"/>
+  </g>
+  <text x="323" y="383" text-anchor="middle" fill="#b03808"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="0.5">CALIBRATION</text>
+  <text x="323" y="398" text-anchor="middle" fill="#b03808"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold">&amp;</text>
+  <text x="323" y="413" text-anchor="middle" fill="#b03808"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">RECONSTRUCTION</text>
+</g>
+
+<!-- ── 3. Intermediate Data Products ── -->
+<g id="grp-intdata">
+  <rect id="glow-intdata" x="411" y="349" width="118" height="112" rx="10"
+        fill="#c89000" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <rect x="415" y="355" width="110" height="100" rx="8"
+          fill="#ffffff" stroke="#c89000" stroke-width="1.5"/>
+    <rect x="415" y="355" width="5"   height="100" rx="2" fill="#c89000"/>
+  </g>
+  <!-- Cylinder / database icon -->
+  <ellipse cx="470" cy="373" rx="16" ry="5" fill="none" stroke="#c89000" stroke-width="1.2"/>
+  <line x1="454" y1="373" x2="454" y2="390" stroke="#c89000" stroke-width="1.2"/>
+  <line x1="486" y1="373" x2="486" y2="390" stroke="#c89000" stroke-width="1.2"/>
+  <ellipse cx="470" cy="390" rx="16" ry="5" fill="none" stroke="#c89000" stroke-width="1.2"/>
+  <!-- mid stripe -->
+  <ellipse cx="470" cy="381" rx="16" ry="5" fill="none" stroke="#c89000" stroke-width="0.7" opacity="0.5" stroke-dasharray="3,3"/>
+  <text x="470" y="410" text-anchor="middle" fill="#9a7000"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">INTERMEDIATE</text>
+  <text x="470" y="424" text-anchor="middle" fill="#9a7000"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">DATA PRODUCTS</text>
+</g>
+
+<!-- ── 4. Additional Analysis ── -->
+<g id="grp-addanal">
+  <rect id="glow-addanal" x="543" y="349" width="138" height="112" rx="6"
+        fill="#4a70a0" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <polygon points="548,355 658,355 676,405 658,455 548,455"
+             fill="#ffffff" stroke="#4a70a0" stroke-width="1.5"/>
+    <rect x="548" y="355" width="5" height="100" fill="#4a70a0"/>
+  </g>
+  <text x="606" y="397" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="0.5">ADDITIONAL</text>
+  <text x="606" y="413" text-anchor="middle" fill="#2a4870"
+        font-family="'Courier New', monospace" font-size="11" font-weight="bold" letter-spacing="0.5">ANALYSIS</text>
+</g>
+
+<!-- ── 5. AI-Ready Training Data ── -->
+<g id="grp-aiready">
+  <rect id="glow-aiready" x="690" y="349" width="128" height="112" rx="10"
+        fill="#1a9060" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <rect x="694" y="355" width="120" height="100" rx="8"
+          fill="#ffffff" stroke="#1a9060" stroke-width="1.5"/>
+    <rect x="694" y="355" width="5"   height="100" rx="2" fill="#1a9060"/>
+  </g>
+  <!-- Mini neural network icon (left portion of box) -->
+  <!-- Input layer -->
+  <circle cx="716" cy="381" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <circle cx="716" cy="395" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <circle cx="716" cy="409" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <!-- Hidden layer -->
+  <circle cx="732" cy="386" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <circle cx="732" cy="404" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <!-- Output layer -->
+  <circle cx="748" cy="395" r="3.5" fill="none" stroke="#1a9060" stroke-width="1.2"/>
+  <!-- Connections -->
+  <g stroke="#1a9060" stroke-width="0.7" opacity="0.45">
+    <line x1="720" y1="381" x2="729" y2="386"/>
+    <line x1="720" y1="381" x2="729" y2="404"/>
+    <line x1="720" y1="395" x2="729" y2="386"/>
+    <line x1="720" y1="395" x2="729" y2="404"/>
+    <line x1="720" y1="409" x2="729" y2="386"/>
+    <line x1="720" y1="409" x2="729" y2="404"/>
+    <line x1="736" y1="386" x2="745" y2="395"/>
+    <line x1="736" y1="404" x2="745" y2="395"/>
+  </g>
+  <!-- Labels (right portion) -->
+  <text x="779" y="385" text-anchor="middle" fill="#1a5040"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">AI-READY</text>
+  <text x="779" y="399" text-anchor="middle" fill="#1a5040"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">TRAINING</text>
+  <text x="779" y="413" text-anchor="middle" fill="#1a5040"
+        font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="0.3">DATA</text>
+  <text x="779" y="429" text-anchor="middle" fill="#4ab888"
+        font-family="'Courier New', monospace" font-size="9.5">curated &amp; labelled</text>
+</g>
+
+<!-- ══════════════════════════════════════
+     TRAINING SIDE (always visible, drawn on top of feed line)
+     ══════════════════════════════════════ -->
+
+<!-- ── HAIDIS Training ── -->
+<g id="grp-haidis">
+  <rect id="glow-haidis" x="892" y="340" width="232" height="130" rx="6"
+        fill="#9933bb" opacity="0" filter="url(#blur-glow)"/>
+  <g filter="url(#shadow-node)">
+    <polygon points="900,350 1090,350 1115,405 1090,460 900,460 920,405"
+             fill="#ffffff" stroke="#9933bb" stroke-width="2"/>
+    <!-- Left accent following the notch shape -->
+    <polygon points="900,350 905,350 925,405 905,460 900,460 920,405"
+             fill="#9933bb"/>
+  </g>
+  <text x="997" y="391" text-anchor="middle" fill="#7722aa"
+        font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="2">HAIDIS</text>
+  <text x="997" y="411" text-anchor="middle" fill="#7722aa"
+        font-family="'Courier New', monospace" font-size="13" font-weight="bold" letter-spacing="1">TRAINING</text>
+  <text x="997" y="431" text-anchor="middle" fill="#aa66cc"
+        font-family="'Courier New', monospace" font-size="10.5">SAGIPS model update</text>
+</g>
+
+<!-- ── SAGIPS Model ── -->
+<g id="grp-sagips">
+  <g filter="url(#shadow-node)">
+    <rect id="sagips-box" x="1140" y="350" width="155" height="110" rx="10"
+          fill="#ffffff" stroke="#0099cc" stroke-width="2"/>
+    <rect x="1140" y="350" width="5" height="110" rx="2" fill="#0099cc"/>
+  </g>
+  <!-- Stylized brain icon (left portion, cx≈1183, cy≈392) -->
+  <!-- Left hemisphere -->
+  <path d="M 1183,371 C 1176,371 1167,376 1165,385 C 1163,394 1168,401 1176,403 C 1179,404 1181,404 1183,403"
+        fill="none" stroke="#0099cc" stroke-width="1.3"/>
+  <!-- Right hemisphere -->
+  <path d="M 1183,371 C 1190,371 1199,376 1201,385 C 1203,394 1198,401 1190,403 C 1187,404 1185,404 1183,403"
+        fill="none" stroke="#0099cc" stroke-width="1.3"/>
+  <!-- Top bumps -->
+  <path d="M 1172,377 C 1170,373 1173,370 1177,371" fill="none" stroke="#0099cc" stroke-width="1"/>
+  <path d="M 1194,377 C 1196,373 1193,370 1189,371" fill="none" stroke="#0099cc" stroke-width="1"/>
+  <!-- Centre divide -->
+  <line x1="1183" y1="371" x2="1183" y2="403"
+        stroke="#0099cc" stroke-width="0.8" stroke-dasharray="2,2"/>
+  <!-- Gyri (fold lines, left) -->
+  <path d="M 1169,383 C 1171,380 1175,381 1176,384" fill="none" stroke="#0099cc" stroke-width="0.9"/>
+  <path d="M 1168,391 C 1170,388 1174,389 1175,392" fill="none" stroke="#0099cc" stroke-width="0.9"/>
+  <!-- Gyri (right) -->
+  <path d="M 1190,383 C 1192,380 1196,381 1197,384" fill="none" stroke="#0099cc" stroke-width="0.9"/>
+  <path d="M 1190,391 C 1192,388 1196,389 1197,392" fill="none" stroke="#0099cc" stroke-width="0.9"/>
+  <!-- Labels (right portion) -->
+  <text x="1248" y="386" text-anchor="middle" fill="#006890"
+        font-family="'Courier New', monospace" font-size="13" font-weight="bold" letter-spacing="1">SAGIPS</text>
+  <text x="1248" y="402" text-anchor="middle" fill="#006890"
+        font-family="'Courier New', monospace" font-size="13" font-weight="bold" letter-spacing="1">MODEL</text>
+  <text x="1248" y="418" text-anchor="middle" fill="#3399bb"
+        font-family="'Courier New', monospace" font-size="10">trained weights</text>
+  <text x="1248" y="432" text-anchor="middle" fill="#3399bb"
+        font-family="'Courier New', monospace" font-size="10">v1.0 → ...</text>
+</g>
+
+<!-- ══════════════════════════════════════
+     PACKETS LAYER (empty — Stage 1 is static)
+     ══════════════════════════════════════ -->
+<g id="packets"></g>
+
+<!-- ══════════════════════════════════════
+     LEGEND  (bottom-left)
+     ══════════════════════════════════════ -->
+<g transform="translate(36, 645)">
+  <rect x="-6" y="-8" width="548" height="100" rx="8"
+        fill="white" opacity="0.92" filter="url(#shadow-node)"/>
+  <!-- Row 1: phase 1 + phase 2 -->
+  <rect x="4"   y="4"  width="18" height="12" rx="2" fill="#1a9060"/>
+  <text x="29" y="15" fill="#1a5040" font-family="'Courier New', monospace" font-size="11" font-weight="bold">Phase 1: AI-Ready Training Data</text>
+  <rect x="272" y="4"  width="18" height="12" rx="2" fill="#e05820"/>
+  <text x="297" y="15" fill="#9a7000" font-family="'Courier New', monospace" font-size="11" font-weight="bold">Phase 2: Intermediate Data</text>
+  <!-- Row 2: phase 3 -->
+  <rect x="4"   y="26" width="18" height="12" rx="2" fill="#cc3344"/>
+  <text x="29" y="37" fill="#992233" font-family="'Courier New', monospace" font-size="11" font-weight="bold">Phase 3: Raw Detector Data</text>
+  <!-- Row 3: line types -->
+  <line x1="4" y1="58" x2="24" y2="58" stroke="#1a9060" stroke-width="3" stroke-dasharray="6,4"/>
+  <text x="30" y="63" fill="#4a6080" font-family="'Courier New', monospace" font-size="11">Training data feed</text>
+  <rect x="180" y="53" width="16" height="10" rx="2" fill="#5588aa"/>
+  <text x="202" y="63" fill="#4a6080" font-family="'Courier New', monospace" font-size="11">Data packet</text>
+  <line x1="308" y1="58" x2="330" y2="58" stroke="#8aaac8" stroke-width="1.5" marker-end="url(#arrowhead-sm)"/>
+  <text x="336" y="63" fill="#4a6080" font-family="'Courier New', monospace" font-size="11">Pipeline flow</text>
+</g>
+
+<!-- ── Phase label ── -->
+<text id="phase-label" x="720" y="775" text-anchor="middle" fill="#4a6080"
+      font-family="'Courier New', monospace" font-size="17" letter-spacing="2" font-weight="bold">
+  Phase 1 — Training on AI-Ready Data
+</text>
+
+<!-- ── Frame timer ── -->
+<text id="frame-timer" x="1404" y="800" text-anchor="end" fill="#8090a8"
+      font-family="'Courier New', monospace" font-size="9"></text>
+
+</svg>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function init() {
+  'use strict';
+  const SVG_NS       = 'http://www.w3.org/2000/svg';
+  const TRAVEL_SPEED = 280;   // SVG units / second
+  const PKT_W = 14, PKT_H = 9;
+  const HAIDIS_CX = 995;      // HAIDIS chevron centre x
+  const SAGIPS_LEFT = 1140;   // SAGIPS box left border (SVG coords)
+  const SLIDE       = 280;    // px HAIDIS+SAGIPS slide left on Phase 1→2
+  const SLIDE2      = 260;    // additional slide on Phase 2→3
+  let   haidisShift = 0;      // updated at transition; shifts effective centres
+
+  // ── Phase definitions ──────────────────────────────────────────────
+  const PHASES = [
+    {
+      glowId:  'glow-aiready',
+      spawnX:  814,
+      feedX1:  814,
+      feedX2:  900,            // HAIDIS left edge (SVG, unshifted)
+      color:   '#1a9060',
+      label:   'Phase 1 \u2014 Training on AI-Ready Data',
+      fadeOnLeave: ['grp-aiready','grp-addanal',
+                    'arrow-add-ai','arrow-int-add']
+    },
+    {
+      glowId:  'glow-intdata',
+      spawnX:  525,
+      feedX1:  525,
+      feedX2:  900 - SLIDE,   // HAIDIS left edge after slide (620)
+      color:   '#c89000',
+      label:   'Phase 2 \u2014 Training on Intermediate Data Products',
+      fadeOnLeave: ['grp-intdata','grp-calreco','arrow-cal-int','arrow-raw-cal']
+    },
+    {
+      glowId:  'glow-raw',
+      spawnX:  240,
+      feedX1:  240,
+      feedX2:  900 - SLIDE - SLIDE2,  // HAIDIS left edge after both slides (360)
+      color:   '#cc3344',
+      label:   'Phase 3 \u2014 Training directly on Raw Detector Data',
+      fadeOnLeave: []
+    }
+  ];
+
+  let currentPhase = 0;
+  let spawnActive  = false;
+  let spawnTimer   = null;
+
+  const feedLine   = document.getElementById('feed-line');
+  const phaseLabel = document.getElementById('phase-label');
+  const packets    = document.getElementById('packets');
+
+  // ── Continuous feed-line flow animation ───────────────────────────
+  gsap.to(feedLine, {
+    attr: { 'stroke-dashoffset': -20 },
+    duration: 0.45,
+    repeat: -1,
+    ease: 'none'
+  });
+
+  // ── Packet factory ─────────────────────────────────────────────────
+  function sendPacket(spawnX, color) {
+    const g    = document.createElementNS(SVG_NS, 'g');
+    const halo = document.createElementNS(SVG_NS, 'rect');
+    const rect = document.createElementNS(SVG_NS, 'rect');
+
+    // Halo — wider, semi-transparent
+    halo.setAttribute('x',      spawnX - 4);
+    halo.setAttribute('y',      405 - PKT_H - 4);
+    halo.setAttribute('width',  PKT_W + 8);
+    halo.setAttribute('height', PKT_H + 8);
+    halo.setAttribute('rx',     4);
+    halo.setAttribute('fill',   color);
+    halo.setAttribute('opacity', '0.22');
+
+    // Main packet
+    rect.setAttribute('x',      spawnX);
+    rect.setAttribute('y',      405 - PKT_H / 2);
+    rect.setAttribute('width',  PKT_W);
+    rect.setAttribute('height', PKT_H);
+    rect.setAttribute('rx',     2);
+    rect.setAttribute('fill',   color);
+
+    g.appendChild(halo);
+    g.appendChild(rect);
+    packets.appendChild(g);
+
+    // Leg 1: spawn → HAIDIS centre (account for visual shift)
+    const dx1  = (HAIDIS_CX + haidisShift) - spawnX - PKT_W / 2;
+    const dur1 = Math.max(dx1, 1) / TRAVEL_SPEED;
+
+    gsap.to(g, {
+      x: dx1,
+      duration: dur1,
+      ease: 'none',
+      onComplete() {
+        // Flash HAIDIS glow
+        gsap.fromTo('#glow-haidis',
+          { opacity: 0 },
+          { opacity: 0.45, duration: 0.1, yoyo: true, repeat: 1 }
+        );
+        // Leg 2: HAIDIS centre → SAGIPS centre
+        const dx2  = SAGIPS_LEFT - HAIDIS_CX;
+        const dur2 = dx2 / TRAVEL_SPEED;
+        gsap.to(g, {
+          x: dx1 + dx2,
+          duration: dur2,
+          ease: 'none',
+          onComplete() {
+            // Flicker SAGIPS box
+            gsap.fromTo('#sagips-box',
+              { opacity: 1 },
+              { opacity: 0.5, duration: 0.12, yoyo: true, repeat: 1 }
+            );
+            g.remove();
+          }
+        });
+      }
+    });
+  }
+
+  // ── Recurring train scheduler ──────────────────────────────────────
+  function sendTrain() {
+    if (!spawnActive) return;
+    const phase = PHASES[currentPhase];
+    for (let i = 0; i < 5; i++) {
+      gsap.delayedCall(i * 0.18, () => {
+        if (spawnActive) sendPacket(phase.spawnX, phase.color);
+      });
+    }
+    spawnTimer = gsap.delayedCall(2.2, sendTrain);
+  }
+
+  // ── Activate a phase (glow + label + packet spawn) ─────────────────
+  function startPhase(idx) {
+    const phase = PHASES[idx];
+    currentPhase = idx;
+
+    // Glow on active source
+    gsap.to('#' + phase.glowId, { opacity: 0.35, duration: 0.7 });
+
+    // Phase label fade-in
+    phaseLabel.textContent = phase.label;
+    gsap.fromTo(phaseLabel, { opacity: 0 }, { opacity: 1, duration: 0.6 });
+
+    // Start trains
+    spawnActive = true;
+    gsap.delayedCall(0.25, sendTrain);
+  }
+
+  // ── Transition: Phase 1 → Phase 2 at t = 8 s ──────────────────────
+  function transitionTo2() {
+    const prev = PHASES[0];
+    const next = PHASES[1];
+
+    // Stop new spawns; let in-flight packets finish naturally
+    spawnActive = false;
+    if (spawnTimer) { spawnTimer.kill(); spawnTimer = null; }
+
+    // Fade out phase label
+    gsap.to(phaseLabel, { opacity: 0, duration: 0.4 });
+
+    // Dim active-source glow
+    gsap.to('#' + prev.glowId, { opacity: 0, duration: 0.9 });
+
+    // Fade pipeline nodes no longer needed
+    prev.fadeOnLeave.forEach(id => {
+      gsap.to('#' + id, { opacity: 0.12, duration: 1.0 });
+    });
+
+    // Slide HAIDIS + SAGIPS + connecting arrow left
+    haidisShift = -SLIDE;
+    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag'], {
+      x: -SLIDE, duration: 1.2, ease: 'power2.inOut', delay: 0.4
+    });
+
+    // Switch feed line: fade out → reposition → fade in
+    const feedTl = gsap.timeline({ delay: 0.5 });
+    feedTl.to(feedLine, { opacity: 0, duration: 0.3 });
+    feedTl.call(() => {
+      feedLine.setAttribute('x1',     next.feedX1);
+      feedLine.setAttribute('x2',     next.feedX2);
+      feedLine.setAttribute('stroke', next.color);
+    });
+    feedTl.to(feedLine, { opacity: 0.9, duration: 0.5 });
+
+    // Start Phase 2 after transition settles
+    gsap.delayedCall(2.2, () => startPhase(1));
+  }
+
+  // ── Transition: Phase 2 → Phase 3 at t = 18.5 s ──────────────────
+  function transitionTo3() {
+    const prev = PHASES[1];
+    const next = PHASES[2];
+
+    // Stop new spawns; let in-flight packets finish naturally
+    spawnActive = false;
+    if (spawnTimer) { spawnTimer.kill(); spawnTimer = null; }
+
+    // Fade out phase label
+    gsap.to(phaseLabel, { opacity: 0, duration: 0.4 });
+
+    // Dim active-source glow
+    gsap.to('#' + prev.glowId, { opacity: 0, duration: 0.9 });
+
+    // Fade pipeline nodes no longer needed
+    prev.fadeOnLeave.forEach(id => {
+      gsap.to('#' + id, { opacity: 0.12, duration: 1.0 });
+    });
+
+    // Slide HAIDIS + SAGIPS + connecting arrow further left
+    haidisShift = -(SLIDE + SLIDE2);
+    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag'], {
+      x: -(SLIDE + SLIDE2), duration: 1.2, ease: 'power2.inOut', delay: 0.4
+    });
+
+    // Switch feed line: fade out → reposition → fade in
+    const feedTl = gsap.timeline({ delay: 0.5 });
+    feedTl.to(feedLine, { opacity: 0, duration: 0.3 });
+    feedTl.call(() => {
+      feedLine.setAttribute('x1',     next.feedX1);
+      feedLine.setAttribute('x2',     next.feedX2);
+      feedLine.setAttribute('stroke', next.color);
+    });
+    feedTl.to(feedLine, { opacity: 0.9, duration: 0.5 });
+
+    // Start Phase 3 after transition settles
+    gsap.delayedCall(2.2, () => startPhase(2));
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────
+  startPhase(0);
+  gsap.delayedCall(8.0,  transitionTo2);
+  gsap.delayedCall(18.5, transitionTo3);
+
+  // ── Frame timer ────────────────────────────────────────────────────
+  const t0 = performance.now();
+  (function tick() {
+    const el = document.getElementById('frame-timer');
+    if (el) el.textContent = 't=' + ((performance.now() - t0) / 1000).toFixed(1) + 's';
+    requestAnimationFrame(tick);
+  })();
+
+})();
+</script>
+</body>
+</html>
