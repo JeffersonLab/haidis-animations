@@ -300,6 +300,108 @@
 <g id="packets"></g>
 
 <!-- ══════════════════════════════════════
+     SAGIPS OUTPUT PLOT  (phase-end display, follows SAGIPS via CSS transform)
+     ══════════════════════════════════════ -->
+<g id="plot-result" opacity="0">
+  <!-- Drop shadow -->
+  <rect x="1151" y="186" width="158" height="160" rx="8" fill="#1a3050" opacity="0.12"/>
+  <!-- Panel background -->
+  <rect x="1147" y="182" width="158" height="160" rx="7"
+        fill="#f8fafc" stroke="#0099cc" stroke-width="1.5"/>
+  <!-- Title strip -->
+  <rect x="1147" y="182" width="158" height="19" rx="7" fill="#d8eefc"/>
+  <rect x="1147" y="194" width="158" height="7"  fill="#d8eefc"/>
+  <text x="1226" y="195" text-anchor="middle" fill="#006890"
+        font-family="'Courier New', monospace" font-size="7.5" font-weight="bold" letter-spacing="0.5">SAGIPS INFERENCE OUTPUT</text>
+
+  <!-- ── Histogram bars (40 bins, 0–1 GeV/c², baseline y=320) ── -->
+  <rect x="1169.0" y="270" width="2.8" height="50"  fill="#4a7ab5"/>
+  <rect x="1172.3" y="283" width="2.8" height="37"  fill="#4a7ab5"/>
+  <rect x="1175.6" y="292" width="2.8" height="28"  fill="#4a7ab5"/>
+  <rect x="1178.9" y="297" width="2.8" height="23"  fill="#4a7ab5"/>
+  <rect x="1182.2" y="270" width="2.8" height="50"  fill="#4a7ab5"/>
+  <rect x="1185.5" y="215" width="2.8" height="105" fill="#4a7ab5"/><!-- π⁰ peak -->
+  <rect x="1188.8" y="289" width="2.8" height="31"  fill="#4a7ab5"/>
+  <rect x="1192.1" y="306" width="2.8" height="14"  fill="#4a7ab5"/>
+  <rect x="1195.4" y="308" width="2.8" height="12"  fill="#4a7ab5"/>
+  <rect x="1198.7" y="309" width="2.8" height="11"  fill="#4a7ab5"/>
+  <rect x="1202.0" y="309" width="2.8" height="11"  fill="#4a7ab5"/>
+  <rect x="1205.3" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1208.6" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1211.9" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1215.2" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1218.5" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1221.8" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1225.1" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1228.4" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1231.7" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1235.0" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1238.3" y="292" width="2.8" height="28"  fill="#4a7ab5"/><!-- η peak -->
+  <rect x="1241.6" y="295" width="2.8" height="25"  fill="#4a7ab5"/>
+  <rect x="1244.9" y="304" width="2.8" height="16"  fill="#4a7ab5"/>
+  <rect x="1248.2" y="309" width="2.8" height="11"  fill="#4a7ab5"/>
+  <rect x="1251.5" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1254.8" y="310" width="2.8" height="10"  fill="#4a7ab5"/>
+  <rect x="1258.1" y="311" width="2.8" height="9"   fill="#4a7ab5"/>
+  <rect x="1261.4" y="311" width="2.8" height="9"   fill="#4a7ab5"/>
+  <rect x="1264.7" y="311" width="2.8" height="9"   fill="#4a7ab5"/>
+  <rect x="1268.0" y="312" width="2.8" height="8"   fill="#4a7ab5"/>
+  <rect x="1271.3" y="312" width="2.8" height="8"   fill="#4a7ab5"/>
+  <rect x="1274.6" y="312" width="2.8" height="8"   fill="#4a7ab5"/>
+  <rect x="1277.9" y="313" width="2.8" height="7"   fill="#4a7ab5"/>
+  <rect x="1281.2" y="313" width="2.8" height="7"   fill="#4a7ab5"/>
+  <rect x="1284.5" y="313" width="2.8" height="7"   fill="#4a7ab5"/>
+  <rect x="1287.8" y="314" width="2.8" height="6"   fill="#4a7ab5"/>
+  <rect x="1291.1" y="314" width="2.8" height="6"   fill="#4a7ab5"/>
+  <rect x="1294.4" y="314" width="2.8" height="6"   fill="#4a7ab5"/>
+  <rect x="1297.7" y="314" width="2.8" height="6"   fill="#4a7ab5"/>
+
+  <!-- ── Axes ── -->
+  <line x1="1169" y1="210" x2="1169" y2="320" stroke="#666" stroke-width="0.8"/>
+  <line x1="1169" y1="320" x2="1301" y2="320" stroke="#666" stroke-width="0.8"/>
+
+  <!-- ── X-axis ticks ── -->
+  <line x1="1169" y1="320" x2="1169" y2="324" stroke="#666" stroke-width="0.7"/>
+  <line x1="1202" y1="320" x2="1202" y2="324" stroke="#666" stroke-width="0.7"/>
+  <line x1="1234" y1="320" x2="1234" y2="324" stroke="#666" stroke-width="0.7"/>
+  <line x1="1267" y1="320" x2="1267" y2="324" stroke="#666" stroke-width="0.7"/>
+  <line x1="1300" y1="320" x2="1300" y2="324" stroke="#666" stroke-width="0.7"/>
+
+  <!-- ── X-axis tick labels ── -->
+  <text x="1169" y="331" text-anchor="middle" fill="#444"
+        font-family="'Courier New', monospace" font-size="7">0.00</text>
+  <text x="1202" y="331" text-anchor="middle" fill="#444"
+        font-family="'Courier New', monospace" font-size="7">0.25</text>
+  <text x="1234" y="331" text-anchor="middle" fill="#444"
+        font-family="'Courier New', monospace" font-size="7">0.50</text>
+  <text x="1267" y="331" text-anchor="middle" fill="#444"
+        font-family="'Courier New', monospace" font-size="7">0.75</text>
+  <text x="1300" y="331" text-anchor="middle" fill="#444"
+        font-family="'Courier New', monospace" font-size="7">1.00</text>
+
+  <!-- ── X-axis title ── -->
+  <text x="1234" y="341" text-anchor="middle" fill="#333"
+        font-family="'Courier New', monospace" font-size="7.5" font-style="italic">
+    M(&#947;&#8321;,&#947;&#8322;) [GeV/c&#178;]
+  </text>
+
+  <!-- ── Peak annotations ── -->
+  <!-- π⁰ → γγ  (bin 5, peak top at x≈1186, y=215) -->
+  <line x1="1196" y1="222" x2="1189" y2="216" stroke="#555" stroke-width="0.8"
+        marker-end="url(#arrowhead-sm)"/>
+  <text x="1198" y="222" fill="#222" font-family="serif" font-size="9.5" font-style="italic">
+    &#960;&#8304; &#8594; &#947;&#947;
+  </text>
+
+  <!-- η → γγ  (bins 21-22, peak top at x≈1239, y=292) -->
+  <line x1="1247" y1="282" x2="1241" y2="292" stroke="#555" stroke-width="0.8"
+        marker-end="url(#arrowhead-sm)"/>
+  <text x="1249" y="282" fill="#222" font-family="serif" font-size="9.5" font-style="italic">
+    &#951; &#8594; &#947;&#947;
+  </text>
+</g>
+
+<!-- ══════════════════════════════════════
      LEGEND  (bottom-left)
      ══════════════════════════════════════ -->
 <g transform="translate(36, 638)">
@@ -499,12 +601,12 @@
     gsap.delayedCall(0.25, sendTrain);
   }
 
-  // ── Transition: Phase 1 → Phase 2 at t = 8 s ──────────────────────
-  function transitionTo2() {
+  // ── Transition: Phase 1 → Phase 2 ─────────────────────────────────
+  function transitionTo2(onDone) {
     const prev = PHASES[0];
     const next = PHASES[1];
 
-    // Stop new spawns; let in-flight packets finish naturally
+    // Stop new spawns (safeguard — should already be stopped)
     spawnActive = false;
     if (spawnTimer) { spawnTimer.kill(); spawnTimer = null; }
 
@@ -519,9 +621,9 @@
       gsap.to('#' + id, { opacity: 0.12, duration: 1.0 });
     });
 
-    // Slide HAIDIS + SAGIPS + connecting arrow left
+    // Slide HAIDIS + SAGIPS + connecting arrow + plot left
     haidisShift = -SLIDE;
-    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag'], {
+    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag', '#plot-result'], {
       x: -SLIDE, duration: 1.2, ease: 'power2.inOut', delay: 0.4
     });
 
@@ -536,15 +638,15 @@
     feedTl.to(feedLine, { opacity: 0.9, duration: 0.5 });
 
     // Start Phase 2 after transition settles
-    gsap.delayedCall(2.2, () => startPhase(1));
+    gsap.delayedCall(2.2, () => { startPhase(1); if (onDone) onDone(); });
   }
 
-  // ── Transition: Phase 2 → Phase 3 at t = 18.5 s ──────────────────
-  function transitionTo3() {
+  // ── Transition: Phase 2 → Phase 3 ─────────────────────────────────
+  function transitionTo3(onDone) {
     const prev = PHASES[1];
     const next = PHASES[2];
 
-    // Stop new spawns; let in-flight packets finish naturally
+    // Stop new spawns (safeguard)
     spawnActive = false;
     if (spawnTimer) { spawnTimer.kill(); spawnTimer = null; }
 
@@ -559,9 +661,9 @@
       gsap.to('#' + id, { opacity: 0.12, duration: 1.0 });
     });
 
-    // Slide HAIDIS + SAGIPS + connecting arrow further left
+    // Slide HAIDIS + SAGIPS + connecting arrow + plot further left
     haidisShift = -(SLIDE + SLIDE2);
-    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag'], {
+    gsap.to(['#grp-haidis', '#grp-sagips', '#arrow-hai-sag', '#plot-result'], {
       x: -(SLIDE + SLIDE2), duration: 1.2, ease: 'power2.inOut', delay: 0.4
     });
 
@@ -576,13 +678,71 @@
     feedTl.to(feedLine, { opacity: 0.9, duration: 0.5 });
 
     // Start Phase 3 after transition settles
-    gsap.delayedCall(2.2, () => startPhase(2));
+    gsap.delayedCall(2.2, () => { startPhase(2); if (onDone) onDone(); });
   }
 
-  // ── Boot ───────────────────────────────────────────────────────────
+  // ── Stop spawning helper ────────────────────────────────────────────
+  function stopSpawning() {
+    spawnActive = false;
+    if (spawnTimer) { spawnTimer.kill(); spawnTimer = null; }
+  }
+
+  // ── Show SAGIPS output plot ─────────────────────────────────────────
+  // Triggers extra SAGIPS flickers, fades in the plot, holds, then fades out.
+  // onComplete is called when the plot is fully hidden again.
+  function showPlot(onComplete) {
+    const sagipsBox = document.getElementById('sagips-box');
+    const plotEl    = document.getElementById('plot-result');
+
+    // 4 extra flickers on the SAGIPS box
+    const flickerTl = gsap.timeline({
+      onComplete: function () {
+        // Fade in the plot panel
+        gsap.fromTo(plotEl,
+          { opacity: 0 },
+          { opacity: 1, duration: 0.7, ease: 'power2.out' }
+        );
+        // After hold, fade out and invoke callback
+        gsap.delayedCall(0.7 + 2.8, function () {
+          gsap.to(plotEl, {
+            opacity: 0, duration: 0.6, ease: 'power2.in',
+            onComplete: onComplete || null
+          });
+        });
+      }
+    });
+    for (let i = 0; i < 4; i++) {
+      flickerTl
+        .to(sagipsBox, { opacity: 0.2, duration: 0.08 }, i * 0.22)
+        .to(sagipsBox, { opacity: 1.0, duration: 0.08 }, i * 0.22 + 0.08);
+    }
+  }
+
+  // ── Phase 3: periodic plot appearances ─────────────────────────────
+  function schedulePeriodicPlot() {
+    gsap.delayedCall(7.0, function () {
+      if (!spawnActive) return;
+      showPlot(schedulePeriodicPlot);
+    });
+  }
+
+  // ── Boot: event-driven callback chain ──────────────────────────────
   startPhase(0);
-  gsap.delayedCall(8.0,  transitionTo2);
-  gsap.delayedCall(18.5, transitionTo3);
+  gsap.delayedCall(6.0, function () {
+    stopSpawning();
+    showPlot(function () {
+      transitionTo2(function () {
+        gsap.delayedCall(6.0, function () {
+          stopSpawning();
+          showPlot(function () {
+            transitionTo3(function () {
+              schedulePeriodicPlot();
+            });
+          });
+        });
+      });
+    });
+  });
 
   // ── Frame timer ────────────────────────────────────────────────────
   const t0 = performance.now();
