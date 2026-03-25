@@ -165,6 +165,7 @@ Bottom-left box showing all link types and packet colors. Use the same visual pr
    ```bash
    git checkout main && git pull
    ```
+4. **Never commit directly to main.** All changes must go through a feature branch and be pushed to origin from that branch.
 
 ## Gallery page (index.html) conventions
 - Grid of `.card` links, `minmax(320px, 1fr)`, max-width 1100px
