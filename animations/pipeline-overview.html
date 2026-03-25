@@ -474,6 +474,7 @@
       feedX2:  900,            // HAIDIS left edge (SVG, unshifted)
       color:   '#1a9060',
       label:   'Phase 1 \u2014 Training on AI-Ready Data',
+      streams: [0],            // 1 stream at centre
       fadeOnLeave: ['grp-aiready','grp-addanal',
                     'arrow-add-ai','arrow-int-add']
     },
@@ -484,6 +485,7 @@
       feedX2:  900 - SLIDE,   // HAIDIS left edge after slide (620)
       color:   '#c89000',
       label:   'Phase 2 \u2014 Training on Intermediate Data Products',
+      streams: [-10, +10],     // 2 parallel streams
       fadeOnLeave: ['grp-intdata','grp-calreco','arrow-cal-int','arrow-raw-cal']
     },
     {
@@ -493,6 +495,7 @@
       feedX2:  900 - SLIDE - SLIDE2,  // HAIDIS left edge after both slides (360)
       color:   '#cc3344',
       label:   'Phase 3 \u2014 Training directly on Raw Detector Data',
+      streams: [-14, 0, +14],  // 3 parallel streams
       fadeOnLeave: []
     }
   ];
@@ -514,29 +517,19 @@
   });
 
   // ── Packet factory ─────────────────────────────────────────────────
-  function sendPacket(spawnX, color) {
+  function sendPacket(spawnX, color, streamY) {
+    if (streamY === undefined) streamY = 405;
     const g    = document.createElementNS(SVG_NS, 'g');
-    const halo = document.createElementNS(SVG_NS, 'rect');
     const rect = document.createElementNS(SVG_NS, 'rect');
 
-    // Halo — wider, semi-transparent
-    halo.setAttribute('x',      spawnX - 4);
-    halo.setAttribute('y',      405 - PKT_H - 4);
-    halo.setAttribute('width',  PKT_W + 8);
-    halo.setAttribute('height', PKT_H + 8);
-    halo.setAttribute('rx',     4);
-    halo.setAttribute('fill',   color);
-    halo.setAttribute('opacity', '0.22');
-
-    // Main packet
+    // Main packet (no halo shadow)
     rect.setAttribute('x',      spawnX);
-    rect.setAttribute('y',      405 - PKT_H / 2);
+    rect.setAttribute('y',      streamY - PKT_H / 2);
     rect.setAttribute('width',  PKT_W);
     rect.setAttribute('height', PKT_H);
     rect.setAttribute('rx',     2);
     rect.setAttribute('fill',   color);
 
-    g.appendChild(halo);
     g.appendChild(rect);
     packets.appendChild(g);
 
@@ -580,7 +573,10 @@
     const phase = PHASES[currentPhase];
     for (let i = 0; i < 5; i++) {
       gsap.delayedCall(i * 0.18, () => {
-        if (spawnActive) sendPacket(phase.spawnX, phase.color);
+        if (!spawnActive) return;
+        phase.streams.forEach(yOff => {
+          sendPacket(phase.spawnX, phase.color, 405 + yOff);
+        });
       });
     }
     spawnTimer = gsap.delayedCall(2.2, sendTrain);
