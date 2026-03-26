@@ -115,6 +115,8 @@
   <line x1="0" y1="0" x2="-10" y2="-10" stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
   <line x1="0" y1="0" x2="11"  y2="6"   stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
   <line x1="0" y1="0" x2="-11" y2="6"   stroke="#ff7777" stroke-width="1.5" opacity="0.85"/>
+  <!-- Particle bunch layer (populated by JS) -->
+  <g id="ring-particles"></g>
 </g>
 <text x="82" y="462" text-anchor="middle" fill="#992233"
       font-family="'Courier New', monospace" font-size="10.5" font-weight="bold" letter-spacing="1">DAQ / DETECTOR</text>
@@ -596,7 +598,10 @@
         });
       });
     }
-    spawnTimer = gsap.delayedCall(2.2, sendTrain);
+    // Phase 3 trains are driven by the ring flash, not a timer
+    if (currentPhase < 2) {
+      spawnTimer = gsap.delayedCall(2.2, sendTrain);
+    }
   }
 
   // ── Activate a phase (glow + label + packet spawn) ─────────────────
@@ -611,9 +616,11 @@
     phaseLabel.textContent = phase.label;
     gsap.fromTo(phaseLabel, { opacity: 0 }, { opacity: 1, duration: 0.6 });
 
-    // Start trains
+    // Phases 1 & 2: timer-driven trains; Phase 3: ring-flash-driven (no timer)
     spawnActive = true;
-    gsap.delayedCall(0.25, sendTrain);
+    if (idx < 2) {
+      gsap.delayedCall(0.25, sendTrain);
+    }
   }
 
   // ── Transition: Phase 1 → Phase 2 ─────────────────────────────────
@@ -757,6 +764,86 @@
       showPlot(schedulePeriodicPlot);
     });
   }
+
+  // ── DAQ ring: continuously orbiting particle bunch ──────────────────
+  // One bunch of 5 particles travels clockwise around the outer ring
+  // (radius 36 in icon-collider local coords, centre at SVG 82,405).
+  // θ = 0 is the rightmost point (East / 3-o'clock).  Each time the bunch
+  // crosses that point the detector segment flashes.  In Phase 3 the
+  // flash also fires a packet train toward RAW DETECTOR DATA.
+  (function initRing() {
+    const RING_R      = 36;
+    const RING_PERIOD = 2.2;           // seconds per revolution
+    const SPREAD_DEG  = [-12, -6, 0, 6, 12];  // angular offsets within bunch
+
+    const ringGroup = document.getElementById('ring-particles');
+
+    // Soft glow disc at the East detector (fires on collision)
+    const eastGlow = document.createElementNS(SVG_NS, 'circle');
+    eastGlow.setAttribute('cx',     RING_R);
+    eastGlow.setAttribute('cy',     0);
+    eastGlow.setAttribute('r',      14);
+    eastGlow.setAttribute('fill',   '#ff4444');
+    eastGlow.setAttribute('opacity', 0);
+    eastGlow.setAttribute('filter', 'url(#blur-glow)');
+    ringGroup.appendChild(eastGlow);
+
+    // Five particle dots that form the bunch
+    const bunchDots = SPREAD_DEG.map((deg, i) => {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('r',       i === 2 ? 3 : 2);
+      c.setAttribute('fill',    i === 2 ? '#ff5555' : '#ff8888');
+      c.setAttribute('opacity', i === 2 ? '1' : '0.65');
+      ringGroup.appendChild(c);
+      return { el: c, dRad: deg * Math.PI / 180 };
+    });
+
+    // Position all dots at angle theta
+    function updateBunch(theta) {
+      bunchDots.forEach(({ el, dRad }) => {
+        const a = theta + dRad;
+        el.setAttribute('cx', (RING_R * Math.cos(a)).toFixed(2));
+        el.setAttribute('cy', (RING_R * Math.sin(a)).toFixed(2));
+      });
+    }
+
+    // Flash East segment; in Phase 3 trigger a packet train
+    function triggerCollision() {
+      gsap.fromTo(eastGlow,
+        { opacity: 0 },
+        { opacity: 0.85, duration: 0.07, yoyo: true, repeat: 1 }
+      );
+      if (currentPhase === 2 && spawnActive) {
+        sendTrain();
+      }
+    }
+
+    // Start bunch at top of ring (θ = −π/2) and animate clockwise.
+    // In SVG coords (y-down) θ increases → clockwise:
+    //   θ = −π/2  → North (top)
+    //   θ = 0     → East (rightmost)  ← flash point
+    //   θ = +π/2  → South (bottom)
+    //   θ = ±π    → West (leftmost)
+    const ringProxy = { theta: -Math.PI / 2 };
+    let prevTheta   = ringProxy.theta;
+    updateBunch(ringProxy.theta);   // set initial visual position
+
+    gsap.to(ringProxy, {
+      theta:    -Math.PI / 2 + Math.PI * 2,  // full clockwise revolution
+      duration: RING_PERIOD,
+      repeat:   -1,
+      ease:     'none',
+      onUpdate() {
+        const θ = ringProxy.theta;
+        updateBunch(θ);
+        // Detect upward zero-crossing → bunch arriving at East
+        if (prevTheta < 0 && θ >= 0) {
+          triggerCollision();
+        }
+        prevTheta = θ;
+      }
+    });
+  })();
 
   // ── Boot: event-driven callback chain ──────────────────────────────
   startPhase(0);
