@@ -833,6 +833,7 @@
       duration: RING_PERIOD,
       repeat:   -1,
       ease:     'none',
+      delay:    5.0,
       onUpdate() {
         const θ = ringProxy.theta;
         updateBunch(θ);
@@ -845,21 +846,23 @@
     });
   })();
 
-  // ── Boot: event-driven callback chain ──────────────────────────────
-  startPhase(0);
-  gsap.delayedCall(6.0, function () {
-    stopSpawning();
-    showPlot(function () {
-      transitionTo2(function () {
-        // Phase 2 running — briefly flash Theory Update below SAGIPS
-        showTheoryUpdate(null);
-        gsap.delayedCall(6.0, function () {
-          stopSpawning();
-          showPlot(function () {
-            transitionTo3(function () {
-              // Phase 3 running — briefly flash Theory Update again
-              showTheoryUpdate(function () {
-                schedulePeriodicPlot();
+  // ── Boot: event-driven callback chain (5 s initial delay) ──────────
+  gsap.delayedCall(5.0, function () {
+    startPhase(0);
+    gsap.delayedCall(6.0, function () {
+      stopSpawning();
+      showPlot(function () {
+        transitionTo2(function () {
+          // Phase 2 running — briefly flash Theory Update below SAGIPS
+          showTheoryUpdate(null);
+          gsap.delayedCall(6.0, function () {
+            stopSpawning();
+            showPlot(function () {
+              transitionTo3(function () {
+                // Phase 3 running — briefly flash Theory Update again
+                showTheoryUpdate(function () {
+                  schedulePeriodicPlot();
+                });
               });
             });
           });
