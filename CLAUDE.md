@@ -9,6 +9,9 @@ index.html                      ← Gallery/selector page (one card per animatio
 animations/
   training-phase.html           ← Training topology: data senders → LB → workers → MLFlow
   pipeline-overview.html        ← Adaptive pipeline: 3-phase training data progression
+  node-detail.html              ← Perlmutter node internals: ERSAP → SHMem → SAGIPS ranks · MPI ring · MLFlow
+plans/
+  node-detail.md                ← Implementation plan for node-detail (phased)
 README.md
 CLAUDE.md
 ```
@@ -35,6 +38,7 @@ CSS keeps it letterboxed at 16:9:
 ```css
 svg { width: 100vw; height: 100vh; max-width: 177.78vh; max-height: 56.25vw; }
 ```
+If the scene needs more vertical space (e.g. a legend that would clip below 810px), expand the viewBox height — `node-detail.html` uses `1440×845`. The letterbox CSS still scales correctly; the scene just renders slightly taller than a pure 16:9 frame at the same width.
 
 ### Background
 - Body bg: `#e8eef6`
@@ -112,6 +116,43 @@ gsap.timeline()                             // for sequenced phase animations
 gsap.fromTo(el, { opacity:0 }, { opacity:1 })
 ```
 
+### Frame timer (live clock)
+Use a `requestAnimationFrame` IIFE — do NOT use GSAP for this:
+```js
+(function () {
+  const counter = document.getElementById('frame-counter');
+  const t0 = performance.now();
+  function tick() {
+    counter.textContent = 't = ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+```
+
+### `flashEl` re-entrancy pitfall
+When a node box is flashed on every packet arrival and multiple packets can arrive before the flash decays, naively reading `stroke-width` mid-tween will ratchet the border inward on each call. Fix: cache the baseline once in `dataset`, kill in-flight tweens, then reset before flashing:
+```js
+function flashEl(groupId, brightColor, duration) {
+  const grp = document.getElementById(groupId);
+  const r   = grp.querySelector('rect');
+  if (!r.dataset.baseStroke) {
+    r.dataset.baseStroke = r.getAttribute('stroke');
+    r.dataset.baseWidth  = r.getAttribute('stroke-width') || '1.5';
+  }
+  const origStroke = r.dataset.baseStroke;
+  const origWidth  = parseFloat(r.dataset.baseWidth);
+  gsap.killTweensOf(r);
+  gsap.set(r, { attr: { stroke: origStroke, 'stroke-width': origWidth } });
+  gsap.to(r, {
+    attr: { stroke: brightColor, 'stroke-width': origWidth + 1.5 }, duration: 0.1,
+    onComplete: () => gsap.to(r, {
+      attr: { stroke: origStroke, 'stroke-width': origWidth }, duration: duration || 0.3
+    })
+  });
+}
+```
+
 ### Feed line transition (pipeline-overview)
 Do NOT use `gsap.to(line, { attr: { x1: newX } })` — SVG presentation attributes do not interpolate. Use a timeline:
 ```js
@@ -135,9 +176,10 @@ tl.to(feedLine, { opacity: 0.9, duration: 0.5 });
 
 ### Legend
 Bottom-left box showing all link types and packet colors. Use the same visual primitives (small rects, polylines, dashed lines, polygon diamonds) as appear in the scene.
-- Font: **11px**, row pitch: **26px**
+- Font: **11px**, row pitch: **26px** for single-column; **18px** for two-column dense layout
 - Box sized to contain all rows with 8px top/bottom padding and 6px left/right margin
 - All icons centered vertically on their text row (icon center-y = text baseline - ~4px)
+- For dense legends (8+ entries), use a 2-column layout: two icon+label groups per row, each column occupying half the box width
 
 ## HAIDIS system components reference
 | Element | Real system |
@@ -172,4 +214,4 @@ Bottom-left box showing all link types and packet colors. Use the same visual pr
 - Each card: `.card-thumb` (160px, static SVG preview) + `.card-body` (tag / title / desc / footer)
 - Badge colors: LIVE = green (`#e8f4ee` / `#1a6040`), PENDING = grey
 - Placeholder cards: `class="card placeholder"` with `opacity:0.5; pointer-events:none`
-- Thumbnail SVG: viewBox `0 0 320 160`, same color palette, no animation
+- Thumbnail SVG: viewBox `0 0 320 160`, same color palette, no GSAP. SMIL declarative animation (`<animateTransform>`, `<animate>`) is fine for packet motion and ring diamonds — use the opacity trick to hide the return trip: `values="0.85;0.85;0;0;0.85"` with matching `keyTimes`
