@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HAIDIS Pipeline Overview 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL stage. The processing pipeline runs left → right along one axis; HAIDIS + SAGIPS
+   ride a hover-sled that moves upstream each phase while bypassed stages sink into the floor.
+   HUD in the corners, phase caption + stepper bottom-centre, live readouts float on 3D anchors.
+   Same instrument-room dark theme and tokens as haidis-training-phase-3d.html. */
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+:root{
+  --bg:#0c1524;
+  --floor:#101c2e;
+  --panel:rgba(13,22,38,.84);
+  --line:#263a59;
+  --fg:#dce7f6;
+  --muted:#8ea3c2;
+  --raw:#ee4b5c;
+  --cal:#ff7a3d;
+  --int:#e2b13c;
+  --ana:#7ea2d6;
+  --ai:#2fd48a;
+  --haidis:#b65ae6;
+  --sagips:#22b8e8;
+  --buf:#5b8fd0;
+  --ready:#9cbbe0;
+  --track:#1b2a43;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --lfs:clamp(8px,.72vw,11.5px);
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden}
+body{font-family:var(--display)}
+#app{position:fixed;inset:0;background:var(--bg)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+
+/* ── floating readouts ── */
+.lbl{position:absolute;left:0;top:0;will-change:transform;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--c,var(--line));border-radius:3px;
+  padding:.5em .7em .55em;font:400 var(--lfs)/1.4 var(--mono);color:var(--muted);white-space:nowrap;
+  font-variant-numeric:tabular-nums;backdrop-filter:blur(3px);transition:border-color .2s}
+.lbl b{display:block;font:600 1.22em/1.2 var(--display);letter-spacing:.09em;color:var(--fg);text-transform:uppercase}
+.lbl .role{color:var(--fg);opacity:.8}
+.lbl span{display:block}
+.lbl hr{border:0;border-top:1px solid var(--line);margin:.4em 0}
+.kv{display:flex;justify-content:space-between;gap:1.2em}
+.kv em{font-style:normal;color:var(--fg);font-weight:500}
+.lbl.flash,.lbl.on{border-color:var(--c)}
+.lbl.stg{padding:.4em .6em .45em}
+.lbl.stg b{font-size:1.06em;letter-spacing:.05em}
+.lbl .src{display:none;align-items:center;gap:.5em;margin-top:.35em;color:var(--c);letter-spacing:.08em}
+.lbl.on .src{display:flex}
+.lbl .src i{width:.65em;height:.65em;border-radius:50%;background:var(--c);box-shadow:0 0 .7em var(--c)}
+.lbl.hai{--c:var(--haidis)}
+.lbl.hai em{color:var(--haidis)}
+.lbl.sag{--c:var(--sagips)}
+.lbl.sag em{color:var(--sagips)}
+.lbl.ghost{background:rgba(13,22,38,.5);border:1px dashed var(--line);padding:.2em .55em;letter-spacing:.06em;backdrop-filter:none}
+.lbl.ghost b{display:inline;font-size:1em;color:var(--muted);letter-spacing:.08em}
+.lbl.rate{background:none;border:0;backdrop-filter:none;padding:0;color:var(--c,var(--muted));letter-spacing:.04em;font-size:calc(var(--lfs)*1.05)}
+.lbl.rate.title{color:var(--muted);letter-spacing:.14em}
+
+/* ── HUD ── */
+.hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;
+  padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 24px;flex-wrap:wrap}
+.head{max-width:52ch;min-width:0}
+.eyebrow{margin:0;font:500 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--haidis)}
+h1{margin:.3em 0 .25em;font:700 clamp(24px,2.6vw,38px)/1 var(--display);letter-spacing:.04em;text-transform:uppercase;text-wrap:balance}
+.sub{margin:0;font:400 clamp(11px,.9vw,13px)/1.5 var(--mono);color:var(--muted)}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:0}
+.ctrl{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;pointer-events:auto}
+.ctrl button,.stepper button{font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:9px 12px;cursor:pointer;
+  transition:color .15s,border-color .15s,background .15s}
+.ctrl button:hover,.stepper button:hover{color:var(--fg);border-color:var(--muted)}
+.ctrl button[aria-pressed="true"]{color:var(--bg);background:var(--fg);border-color:var(--fg)}
+.ctrl button:focus-visible,.stepper button:focus-visible{outline:2px solid var(--haidis);outline-offset:2px}
+.ctrl .sep{width:1px;background:var(--line);margin:0 4px}
+.legend{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:9px 13px;
+  display:grid;grid-template-columns:repeat(2,auto);gap:7px 20px;font:400 11px/1.2 var(--mono);color:var(--fg);min-width:0}
+.legend div{display:flex;align-items:center;gap:8px}
+.legend svg{flex:none;width:24px;height:14px}
+
+.row.bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:10px 16px}
+.phasebar{grid-column:2;display:flex;flex-direction:column;align-items:center;gap:9px}
+.caption{font:600 clamp(16px,1.7vw,26px)/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--c,var(--fg));text-align:center;text-shadow:0 0 18px rgba(0,0,0,.7)}
+.stepper{display:flex;gap:6px;pointer-events:auto}
+.stepper button{display:flex;align-items:center;padding:7px 11px 7px 8px}
+.stepper button i{font-style:normal;display:inline-grid;place-items:center;width:1.55em;height:1.55em;border-radius:50%;
+  border:1px solid var(--c);color:var(--c);margin-right:.55em;font-size:.92em;letter-spacing:0}
+.stepper button[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--bg)}
+.stepper button[aria-pressed="true"] i{border-color:var(--bg);color:var(--bg)}
+.foot{grid-column:3;justify-self:end;display:flex;align-items:flex-end;gap:16px;font:400 11px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+#clock{color:var(--fg)}
+
+@media (max-width:720px){
+  .lbl .sec{display:none}
+  .side{align-items:stretch;width:100%}
+  .ctrl{justify-content:flex-start}
+  .legend{grid-template-columns:repeat(2,minmax(0,1fr));font-size:10px;gap:6px 12px;padding:8px 10px}
+  .legend div{white-space:normal}
+  .sub,.hint{display:none}
+  .row.bottom{grid-template-columns:1fr}
+  .phasebar{grid-column:1;align-items:flex-start}
+  .caption{text-align:left}
+  .foot{grid-column:1;justify-self:start}
+}
+@media (max-height:560px){ .legend,.sub{display:none} }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="scene" role="img" aria-label="3D animation of the HAIDIS adaptive training data pipeline. A detector ring feeds a left-to-right processing pipeline: raw detector data, calibration and reconstruction, intermediate data products, additional analysis and AI-ready training data. HAIDIS and the SAGIPS model ride a sled that moves upstream over three phases, training first on AI-ready data, then on intermediate data products, then directly on raw detector data, while the processing stages it no longer needs sink into the floor."></canvas>
+  <div id="labels" aria-hidden="true"></div>
+
+  <div class="hud">
+    <div class="row">
+      <header class="head">
+        <p class="eyebrow">HAIDIS · Jefferson Lab</p>
+        <h1>Adaptive Training Data Pipeline</h1>
+        <p class="sub">HAIDIS trains on any stage of the data processing pipeline — from curated AI-ready data to raw detector output</p>
+      </header>
+      <div class="side">
+        <nav class="ctrl" aria-label="View controls">
+          <button type="button" data-view="overview" aria-pressed="true">Overview</button>
+          <button type="button" data-view="detector" aria-pressed="false">Detector</button>
+          <button type="button" data-view="pipeline" aria-pressed="false">Pipeline</button>
+          <button type="button" data-view="training" aria-pressed="false">Training</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" id="playpause" aria-pressed="false">Pause</button>
+        </nav>
+        <aside class="legend" aria-label="Legend">
+          <div><svg viewBox="0 0 24 14"><rect x="5" y="2" width="14" height="10" rx="2" fill="var(--ai)"/></svg>Phase 1 — AI-ready data</div>
+          <div><svg viewBox="0 0 24 14"><line x1="1" y1="7" x2="23" y2="7" stroke="var(--ai)" stroke-width="3" stroke-dasharray="5 3"/></svg>Training data feed</div>
+          <div><svg viewBox="0 0 24 14"><rect x="5" y="2" width="14" height="10" rx="2" fill="var(--int)"/></svg>Phase 2 — Intermediate data</div>
+          <div><svg viewBox="0 0 24 14"><rect x="6" y="3.5" width="12" height="7" rx="1.5" fill="var(--ready)"/></svg>Data packet</div>
+          <div><svg viewBox="0 0 24 14"><rect x="5" y="2" width="14" height="10" rx="2" fill="var(--raw)"/></svg>Phase 3 — Raw detector data</div>
+          <div><svg viewBox="0 0 24 14"><line x1="1" y1="7" x2="17" y2="7" stroke="var(--muted)" stroke-width="1.6"/><path d="M16 3 L23 7 L16 11 Z" fill="var(--muted)"/></svg>Pipeline flow</div>
+          <div><svg viewBox="0 0 24 14"><circle cx="12" cy="7" r="5.2" fill="none" stroke="var(--raw)" stroke-width="1.4"/><circle cx="17.2" cy="7" r="1.9" fill="var(--raw)"/></svg>Detector bunch crossing</div>
+          <div><svg viewBox="0 0 24 14"><rect x="3" y="2" width="18" height="10" rx="1" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2.5 2"/></svg>Bypassed stage</div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="row bottom">
+      <div class="phasebar">
+        <div class="caption" id="caption" aria-live="polite">Phase 1 — Training on AI-Ready Data</div>
+        <nav class="stepper" aria-label="Jump to phase">
+          <button type="button" data-phase="0" aria-pressed="true" style="--c:var(--ai)"><i>1</i>AI-Ready</button>
+          <button type="button" data-phase="1" aria-pressed="false" style="--c:var(--int)"><i>2</i>Intermediate</button>
+          <button type="button" data-phase="2" aria-pressed="false" style="--c:var(--raw)"><i>3</i>Raw</button>
+        </nav>
+      </div>
+      <div class="foot">
+        <span class="hint">Drag to orbit · scroll or pinch to zoom</span>
+        <span id="clock">t=0.0s</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+(function(){
+const V3 = THREE.Vector3, D = Math.PI/180;
+const css = getComputedStyle(document.documentElement);
+const tok = n => new THREE.Color(css.getPropertyValue(n).trim());
+const COL = {};
+['bg','floor','raw','cal','int','ana','ai','haidis','sagips','buf','muted','fg','ready'].forEach(k => COL[k] = tok('--' + k));
+const WHITE = new THREE.Color(0xffffff);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const Q = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+
+/* ───────── timings (seconds) — mirror pipeline-overview.html ───────── */
+const T = { start:5, phaseRun:6, trainEvery:2.2, trainPkts:5, pktGap:.18, bunchPeriod:2.2,
+  flickers:4, plotIn:.7, plotHold:2.8, plotOut:.6,
+  labelOut:.4, glowOut:.9, sink:.8, sinkStagger:.15, slide:1.2, slideDelay:.4,
+  feedDelay:.5, feedOut:.3, feedIn:.5, nextPhase:2.2, periodicPlot:7 };
+if (Q.has('nodelay')) T.start = .5;
+const SPEED = 9;
+
+/* ───────── renderer / scene ───────── */
+const canvas = $('scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = COL.bg.clone();
+scene.fog = new THREE.Fog(COL.bg.getHex(), 55, 115);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 240);
+
+scene.add(new THREE.HemisphereLight(0xa8c0e8, 0x0a1220, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(-1, 24, 16); sun.target.position.set(-5, 0, 0); scene.add(sun.target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 1024);
+Object.assign(sun.shadow.camera, {left:-27, right:27, top:14, bottom:-14, near:1, far:70});
+scene.add(sun);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(150, 100),
+  new THREE.MeshStandardMaterial({color:COL.floor, roughness:.95, metalness:0}));
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(150, 150, 0x22344f, 0x172539);
+grid.position.y = 0.005; grid.material.transparent = true; grid.material.opacity = .5; scene.add(grid);
+
+/* ───────── helpers ───────── */
+function glowTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), r = g.createRadialGradient(32,32,0,32,32,32);
+  r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.25,'rgba(255,255,255,.55)'); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+const GLOW = glowTexture();
+function glow(color, size, opacity){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW, color, transparent:true, opacity, blending:THREE.AdditiveBlending, depthWrite:false}));
+  s.scale.set(size, size, 1); return s;
+}
+function floorGlow(color, sx, sz, opacity){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz), basic(color, {map:GLOW, transparent:true, opacity, blending:THREE.AdditiveBlending, depthWrite:false}));
+  m.rotation.x = -Math.PI/2; m.position.y = .02; return m;
+}
+function std(color, o={}){ return new THREE.MeshStandardMaterial(Object.assign({color, roughness:.55, metalness:.35}, o)); }
+function basic(color, o={}){ return new THREE.MeshBasicMaterial(Object.assign({color}, o)); }
+function tube(curve, r, color, opacity){
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 80, r, 6, false), basic(color, {transparent:true, opacity, depthWrite:false}));
+}
+function arc(a, b, lift){
+  const m = a.clone().lerp(b, .5); m.y = Math.max(a.y, b.y) + lift;
+  return new THREE.CatmullRomCurve3([a, m, b], false, 'centripetal');
+}
+function dashedLine(points, color, opacity, dash=.22, gap=.16){
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineDashedMaterial({color, dashSize:dash, gapSize:gap, transparent:true, opacity, depthWrite:false}));
+  l.computeLineDistances(); return l;
+}
+const FLOW_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 4;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0,0,40,0);
+  gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(255,255,255,1)');
+  g.fillStyle = gr; g.fillRect(0,0,40,4);
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t;
+})();
+function flowTex(repeat){ const t = FLOW_TEX.clone(); t.needsUpdate = true; t.repeat.set(repeat, 1); return t; }
+const NOISE_TEX = (() => {               // scrolling "unfiltered bits" for the raw-data front face
+  const c = document.createElement('canvas'); c.width = 32; c.height = 64;
+  const g = c.getContext('2d'); g.fillStyle = '#05080e'; g.fillRect(0,0,32,64);
+  let seed = 11; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  for (let y = 0; y < 64; y += 2) for (let x = 0; x < 32; x += 2)
+    if (rnd() < .32){ g.fillStyle = `rgba(255,255,255,${(.25 + rnd()*.75).toFixed(2)})`; g.fillRect(x, y, 2, 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.NearestFilter; t.repeat.set(2, 2); return t;
+})();
+const CONE_GEO = new THREE.ConeGeometry(.13, .3, 12).rotateZ(-Math.PI/2);   // apex → +x
+function arrowCone(tipPos, color, opacity){
+  const c = new THREE.Mesh(CONE_GEO, basic(color, {transparent:true, opacity}));
+  c.position.copy(tipPos).add(new V3(-.15, 0, 0)); return c;
+}
+function setFont(g, font, spacing){ g.font = font; if ('letterSpacing' in g) g.letterSpacing = spacing || '0px'; }
+// canvas text only picks up web fonts once they're loaded: draw now, redraw when they arrive
+const FONTS_READY = document.fonts && document.fonts.load
+  ? Promise.all(['700 40px "Barlow Semi Condensed"','600 40px "Barlow Semi Condensed"','400 20px "IBM Plex Mono"','500 20px "IBM Plex Mono"']
+      .map(f => document.fonts.load(f).catch(() => null)))
+  : Promise.resolve();
+function onFonts(fn){ fn(); FONTS_READY.then(fn); }
+
+/* 2D SVG polygons → 3D footprints. K converts SVG units to world units; SVG y (down) → world +z (toward camera). */
+const K = 1/50;
+function svgShape(pts, cx, cy){
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  if (cx === undefined){ cx = (Math.min(...xs) + Math.max(...xs))/2; cy = (Math.min(...ys) + Math.max(...ys))/2; }
+  const sh = new THREE.Shape();
+  pts.forEach(([x, y], i) => { const X = (x - cx)*K, Y = -(y - cy)*K; i ? sh.lineTo(X, Y) : sh.moveTo(X, Y); });
+  sh.closePath(); return sh;
+}
+function extrudeUp(shape, h){ const g = new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:false}); g.rotateX(-Math.PI/2); return g; }
+function shapePts(shape, y){ return shape.getPoints().map(p => new V3(p.x, y, -p.y)); }
+function rectPts(w, d, y){ return [new V3(-w/2,y,-d/2), new V3(w/2,y,-d/2), new V3(w/2,y,d/2), new V3(-w/2,y,d/2)]; }
+function circlePts(r, y, n=48){ const a = []; for (let i = 0; i < n; i++){ const t = i/n*Math.PI*2; a.push(new V3(r*Math.cos(t), y, r*Math.sin(t))); } return a; }
+const closed = pts => pts.concat([pts[0]]);
+
+/* ───────── layout: one axis, upstream (−x) → downstream (+x) ───────── */
+const CHEV = [[268,355],[378,355],[396,405],[378,455],[268,455]];                  // processing-step chevron (2D)
+const HAI  = [[900,350],[1090,350],[1115,405],[1090,460],[900,460],[920,405]];     // HAIDIS notched chevron (2D)
+const HAI_ACC = [[899,349],[905,349],[925,405],[905,461],[899,461],[919,405]];     // its notch accent (1 unit proud: no z-fighting)
+const STAGES = [
+  {id:'raw', title:['Raw detector','data'],          sub:'unfiltered',         short:'Raw detector', x:-17.5, kind:'box',     w:2.2, d:2.0, h:2.4, rate:'~10–100 Gbps', flow:2.4},
+  {id:'cal', title:['Calibration &amp;','reconstruction'],                      short:'Cal &amp; reco', x:-12.5, kind:'chevron', h:2.0, flow:2.0},
+  {id:'int', title:['Intermediate','data products'],                            short:'Intermediate', x:-7.5,  kind:'stack',   r:1.0, h:1.6, rate:'~1–10 Gbps', flow:1.5},
+  {id:'ana', title:['Additional','analysis'],                                   short:'Add’l analysis', x:-2.5, kind:'chevron', h:1.3, flow:1.0},
+  {id:'ai',  title:['AI-ready','training data'],     sub:'curated &amp; labelled', short:'AI-ready', x:2.5,   kind:'net',     w:2.4, d:2.0, h:1.0, rate:'&lt; 1 Gbps', flow:.7},
+];
+STAGES.forEach(s => {
+  if (s.kind === 'chevron'){ s.w = 128*K; s.d = 100*K; }
+  if (s.kind === 'stack'){ s.w = s.d = 2*s.r; }
+  s.left = s.x - s.w/2; s.right = s.x + s.w/2; s.token = '--' + s.id;
+  s.src = 0; s.sink = 0; s.hit = 0;
+});
+const STG = Object.fromEntries(STAGES.map(s => [s.id, s]));
+const PHASES = [
+  {source:'ai',  lanes:[0],           bypass:[],                       flow:.9,  label:'Phase 1 — Training on AI-Ready Data'},
+  {source:'int', lanes:[-.32,.32],    bypass:['ana','ai'],             flow:1.5, label:'Phase 2 — Training on Intermediate Data Products'},
+  {source:'raw', lanes:[-.48,0,.48],  bypass:['cal','int','ana','ai'], flow:2.3, label:'Phase 3 — Training directly on Raw Detector Data', collision:true},
+];
+const DAQ_X = -23.5, RING_R = 2.0, RING_Y = .95, RULER_Z = 3.1;
+const FEED_GAP = 3.0, HAI_HALF = 215*K/2, SAG_OFF = 5.2;
+const sledX = p => STG[PHASES[p].source].right + FEED_GAP + HAI_HALF;   // ≈ 8.85 · −1.35 · −11.25
+
+// pipeline bed + edge lines
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(47, 7.6), basic(0x0f1b2e, {transparent:true, opacity:.75, depthWrite:false}));
+bed.rotation.x = -Math.PI/2; bed.position.set(-5.5, .008, .4); scene.add(bed);
+[-3.4, 4.2].forEach(z => {
+  const l = new THREE.Mesh(new THREE.PlaneGeometry(47, .05), basic(0x8ea3c2, {transparent:true, opacity:.22}));
+  l.rotation.x = -Math.PI/2; l.position.set(-5.5, .011, z); scene.add(l);
+});
+
+/* ───────── 0 · DAQ / detector ring ───────── */
+const daq = new THREE.Group(); daq.position.set(DAQ_X, 0, 0); scene.add(daq);
+{
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, .08, 64), std(0x141a28, {roughness:.9}));
+  pad.position.y = .04; pad.receiveShadow = true; daq.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, .075, 10, 128),
+    std(COL.raw.clone().lerp(COL.bg, .35), {emissive:COL.raw, emissiveIntensity:.35}));
+  ring.rotation.x = Math.PI/2; ring.position.y = RING_Y; ring.castShadow = true; daq.add(ring);
+  const inner = new THREE.Mesh(new THREE.TorusGeometry(1.4, .02, 6, 96), basic(COL.raw, {transparent:true, opacity:.3}));
+  inner.rotation.x = Math.PI/2; inner.position.y = RING_Y; daq.add(inner);
+  const pipeMat = basic(COL.raw, {transparent:true, opacity:.5});
+  const px = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 2*RING_R + .6, 8).rotateZ(Math.PI/2), pipeMat);
+  const pz = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 2*RING_R + .6, 8).rotateX(Math.PI/2), pipeMat);
+  px.position.y = pz.position.y = RING_Y; daq.add(px, pz);
+  for (let k = 0; k < 4; k++){
+    const a = Math.PI/4 + k*Math.PI/2;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, RING_Y, 8), std(0x2a3448));
+    post.position.set(RING_R*Math.cos(a), RING_Y/2, RING_R*Math.sin(a)); daq.add(post);
+  }
+}
+const modMat = std(COL.raw.clone().lerp(COL.bg, .55), {emissive:COL.raw, emissiveIntensity:.2});
+const eastMat = std(COL.raw.clone().lerp(COL.bg, .55), {emissive:COL.raw.clone(), emissiveIntensity:.2});
+[0, Math.PI/2, Math.PI, -Math.PI/2].forEach(a => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(.36, .55, .55), a === 0 ? eastMat : modMat);
+  m.position.set(RING_R*Math.cos(a), RING_Y, RING_R*Math.sin(a)); m.rotation.y = -a; m.castShadow = true; daq.add(m);
+});
+const ipCore = new THREE.Mesh(new THREE.SphereGeometry(.14, 16, 12), basic(0xff6070));
+ipCore.position.y = RING_Y; daq.add(ipCore);
+const ipGlow = glow(COL.raw, 1.4, .35); ipGlow.position.y = RING_Y; daq.add(ipGlow);
+const sparkMat = new THREE.LineBasicMaterial({color:0xff8a8a, transparent:true, opacity:.3});
+{
+  const pts = [];
+  [[1,.7,-1],[-1,.7,-1],[1.1,.4,.6],[-1.1,.4,.6],[.2,1,.9],[-.3,.9,-.2]].forEach(([x,y,z]) => {
+    pts.push(new V3(), new V3(x, y, z).normalize().multiplyScalar(.75));
+  });
+  const sp = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), sparkMat);
+  sp.position.y = RING_Y; daq.add(sp);
+}
+const eastGlow = glow(COL.raw, 2.0, 0); eastGlow.position.set(RING_R, RING_Y, 0); daq.add(eastGlow);
+const BUNCH = [-12,-6,0,6,12].map((deg, i) => {
+  const g = new THREE.Group(), lead = i === 2;
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(lead ? .09 : .06, 12, 8), basic(lead ? 0xff6b6b : 0xff9a9a)));
+  g.add(glow(0xff5a5a, lead ? .9 : .55, lead ? .8 : .5));
+  daq.add(g); return {g, d:deg*D};
+});
+let bunchOn = false, bunchT0 = 0, lastCross = -1, collFlash = 0, crossings = 0;
+
+/* ───────── 1-5 · processing stages ───────── */
+function buildStage(s){
+  const c = COL[s.id], dark = c.clone().lerp(COL.bg, .8);
+  const g = new THREE.Group(); g.position.set(s.x, 0, 0); scene.add(g);
+  const body = new THREE.Group(); g.add(body); s.body = body;
+  s.bodyMat = std(dark, {emissive:c, emissiveIntensity:0});
+  s.edgeMat = new THREE.LineBasicMaterial({color:c.clone()});
+  let foot;
+  if (s.kind === 'box' || s.kind === 'net'){
+    const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
+    const mats = s.id === 'raw' ? [s.bodyMat, s.bodyMat, s.bodyMat, s.bodyMat, basic(c, {map:NOISE_TEX}), s.bodyMat] : s.bodyMat;
+    const m = new THREE.Mesh(geo, mats); m.position.y = s.h/2; m.castShadow = true; body.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), s.edgeMat); e.position.y = s.h/2; body.add(e);
+    foot = rectPts(s.w + .1, s.d + .1, .025);
+  } else if (s.kind === 'chevron'){
+    const shape = svgShape(CHEV), geo = extrudeUp(shape, s.h);
+    const m = new THREE.Mesh(geo, s.bodyMat); m.castShadow = true; body.add(m);
+    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), s.edgeMat));
+    s.scan = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(shapePts(shape, 0)),
+      new THREE.LineBasicMaterial({color:c, transparent:true, opacity:.65}));
+    body.add(s.scan);
+    foot = shapePts(svgShape(CHEV.map(([x,y]) => [332 + (x-332)*1.05, 405 + (y-405)*1.05])), .025);
+  } else {                                                                   // stack: disc store
+    const stack = new THREE.Group(); body.add(stack); s.spin = stack;
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(s.r + .1, s.r + .15, .1, 48), s.bodyMat); ped.position.y = .05; stack.add(ped);
+    const discMat = std(c.clone().lerp(COL.bg, .7), {metalness:.45, roughness:.4, emissive:c, emissiveIntensity:0});
+    s.discMat = discMat;
+    for (let k = 0; k < 3; k++){
+      const y = .32 + k*.5;
+      const d = new THREE.Mesh(new THREE.CylinderGeometry(s.r, s.r, .36, 48), discMat); d.position.y = y; d.castShadow = true; stack.add(d);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(s.r + .01, .022, 6, 64), basic(c, {transparent:true, opacity:.8}));
+      rim.rotation.x = Math.PI/2; rim.position.y = y + .18; stack.add(rim);
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(.3, .06, .04), basic(c)); mark.position.set(0, y, s.r + .005); stack.add(mark);
+    }
+    foot = circlePts(s.r + .1, .025);
+  }
+  if (s.kind !== 'stack'){   // 2D left-accent bar, on the front face
+    const acc = new THREE.Mesh(new THREE.BoxGeometry(.09, s.h*.9, .03), basic(c));
+    acc.position.set(-s.w/2 + .1, s.h/2, s.d/2 + .012); body.add(acc);
+  }
+  if (s.kind === 'net'){     // 3-2-1 neural-net glyph standing on top
+    const net = new THREE.Group(); net.position.y = s.h + .55; body.add(net);
+    const layers = [[[-.62,.36],[-.62,0],[-.62,-.36]], [[0,.2],[0,-.2]], [[.62,0]]];
+    s.nodes = [];
+    const lp = [];
+    layers.forEach((L, li) => L.forEach(([x, y]) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(.085, 14, 10), basic(c.clone()));
+      m.position.set(x, y, 0); net.add(m); s.nodes.push({m, li});
+      if (li < 2) layers[li + 1].forEach(([x2, y2]) => lp.push(new V3(x, y, 0), new V3(x2, y2, 0)));
+    }));
+    net.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lp), new THREE.LineBasicMaterial({color:c, transparent:true, opacity:.45})));
+    s.top = s.h + 1.0;
+  } else s.top = s.h;
+  s.foot = dashedLine(closed(foot), c, 0);
+  s.footMat = s.foot.material; g.add(s.foot);
+  s.glow = glow(c, 4.2, 0); s.glow.position.y = s.top + .3; g.add(s.glow);
+  s.fglow = floorGlow(c, 6, 5, 0); g.add(s.fglow);
+}
+STAGES.forEach(buildStage);
+
+/* ───────── connectors (rate-scaled flow) ───────── */
+const CONN = [];
+function buildConnector(x0, x1, y, rate, to){
+  const a = new V3(x0, y, 0), b = new V3(x1, y, 0);
+  const curve = new THREE.LineCurve3(a, b), len = a.distanceTo(b);
+  const base = tube(curve, .04, COL.muted, .32);
+  const ftex = flowTex(len*rate*.6);
+  const flowMat = basic(COL.muted, {map:ftex, transparent:true, opacity:.6, depthWrite:false, blending:THREE.AdditiveBlending});
+  const flow = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, .065, 8, false), flowMat);
+  const cone = arrowCone(b, COL.muted, .7);
+  scene.add(base, flow, cone);
+  const c = {curve, len, base, flow, flowMat, ftex, cone, rate, to, alpha:1}; CONN.push(c); return c;
+}
+const daqConn = buildConnector(DAQ_X + RING_R + .35, STG.raw.left - .08, RING_Y, 2.6, 'raw');
+for (let i = 0; i < STAGES.length - 1; i++)
+  buildConnector(STAGES[i].right + .1, STAGES[i+1].left - .08, .55, STAGES[i].flow, STAGES[i+1].id);
+
+/* ───────── data-rate ruler on the floor ───────── */
+{
+  const x0 = STG.raw.left, x1 = STG.ai.right, N = 24, pos = [], col = [], idx = [], tc = new THREE.Color();
+  for (let i = 0; i <= N; i++){
+    const t = i/N, x = x0 + (x1 - x0)*t, w = .9 + (.12 - .9)*t;
+    pos.push(x, .014, RULER_Z - w/2, x, .014, RULER_Z + w/2);
+    t < .5 ? tc.copy(COL.raw).lerp(COL.int, t*2) : tc.copy(COL.int).lerp(COL.ai, (t - .5)*2);
+    col.push(tc.r, tc.g, tc.b, tc.r, tc.g, tc.b);
+    if (i < N){ const k = i*2; idx.push(k, k+1, k+2, k+1, k+3, k+2); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  scene.add(new THREE.Mesh(geo, basic(0xffffff, {vertexColors:true, transparent:true, opacity:.5, depthWrite:false, side:THREE.DoubleSide})));
+  ['raw','int','ai'].forEach(id => {
+    const t = new THREE.Mesh(new THREE.PlaneGeometry(.05, 1.3), basic(COL.fg, {transparent:true, opacity:.45}));
+    t.rotation.x = -Math.PI/2; t.position.set(STG[id].x, .016, RULER_Z); scene.add(t);
+  });
+}
+
+/* ───────── HAIDIS + SAGIPS sled ───────── */
+const sled = new THREE.Group(); sled.position.x = sledX(0); scene.add(sled);
+const haiG = new THREE.Group(); sled.add(haiG);
+function haidisTopTexture(){
+  const c = document.createElement('canvas'); c.width = 860; c.height = 440;      // 200 px / world unit
+  const g = c.getContext('2d'), tex = new THREE.CanvasTexture(c);
+  const P = HAI.map(([x, y]) => [(x - 900)*4, (y - 350)*4]), cx = 430, cy = 220;
+  const draw = () => {
+    g.fillStyle = '#221438'; g.fillRect(0, 0, 860, 440);
+    g.beginPath(); P.forEach(([x, y], i) => { const X = cx + (x - cx)*.93, Y = cy + (y - cy)*.88; i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+    g.closePath(); g.strokeStyle = 'rgba(182,90,230,.6)'; g.lineWidth = 6; g.stroke();
+    g.fillStyle = '#efe2fa'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    setFont(g, '700 124px "Barlow Semi Condensed", "Arial Narrow", sans-serif', '14px'); g.fillText('HAIDIS', 470, 190);
+    g.fillStyle = 'rgba(239,226,250,.72)';
+    setFont(g, '500 42px "IBM Plex Mono", monospace', '10px'); g.fillText('TRAINING', 470, 290);
+    tex.needsUpdate = true;
+  };
+  onFonts(draw);
+  tex.repeat.set(1/4.3, 1/2.2); tex.offset.set(.5, .5); tex.anisotropy = 4;   // cap UVs are shape coords (world units)
+  return tex;
+}
+const haiGeo = extrudeUp(svgShape(HAI), .9);
+const haiTop = std(0xffffff, {map:haidisTopTexture(), roughness:.5, metalness:.25, emissive:COL.haidis, emissiveIntensity:0});
+const haiSide = std(COL.haidis.clone().lerp(COL.bg, .78), {emissive:COL.haidis, emissiveIntensity:.06});
+const hai = new THREE.Mesh(haiGeo, [haiTop, haiSide]); hai.position.y = .25; hai.castShadow = true; haiG.add(hai);
+const haiEdgeMat = new THREE.LineBasicMaterial({color:COL.haidis.clone()});
+const haiEdges = new THREE.LineSegments(new THREE.EdgesGeometry(haiGeo, 20), haiEdgeMat); haiEdges.position.y = .25; haiG.add(haiEdges);
+const haiAcc = new THREE.Mesh(extrudeUp(svgShape(HAI_ACC, 1007.5, 405), .92), basic(COL.haidis));
+haiAcc.position.y = .24; haiG.add(haiAcc);
+const haiHalo = glow(COL.haidis, 4.5, .1); haiHalo.position.y = 1.2; haiG.add(haiHalo);
+const pad = floorGlow(COL.haidis, 7, 3.6, .16); sled.add(pad);
+
+// HAIDIS → SAGIPS link
+const linkCurve = new THREE.LineCurve3(new V3(2.2, .7, 0), new V3(SAG_OFF - 1.55 - .35, .7, 0));
+sled.add(tube(linkCurve, .045, COL.muted, .35));
+const linkTex = flowTex(linkCurve.getLength()*1.6);
+const linkFlowMat = basic(COL.haidis, {map:linkTex, transparent:true, opacity:.75, depthWrite:false, blending:THREE.AdditiveBlending});
+sled.add(new THREE.Mesh(new THREE.TubeGeometry(linkCurve, 8, .065, 8, false), linkFlowMat));
+sled.add(arrowCone(new V3(SAG_OFF - 1.55 - .05, .7, 0), COL.muted, .75));
+
+// SAGIPS model: glass case with a spinning core
+const sag = new THREE.Group(); sag.position.x = SAG_OFF; sled.add(sag);
+{
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(3.4, .12, 2.5), std(0x10202c, {roughness:.85}));
+  plinth.position.y = .06; plinth.receiveShadow = true; plinth.castShadow = true; sag.add(plinth);
+  const acc = new THREE.Mesh(new THREE.BoxGeometry(.09, 1.44, .03), basic(COL.sagips)); acc.position.set(-1.45, .92, 1.115); sag.add(acc);
+}
+const glassGeo = new THREE.BoxGeometry(3.1, 1.6, 2.2);
+const glassMat = std(0x0d2a3c, {transparent:true, opacity:.42, roughness:.15, metalness:.25, depthWrite:false});
+const glass = new THREE.Mesh(glassGeo, glassMat); glass.position.y = .92; sag.add(glass);
+const sagEdgeMat = new THREE.LineBasicMaterial({color:COL.sagips.clone(), transparent:true});
+const sagEdges = new THREE.LineSegments(new THREE.EdgesGeometry(glassGeo), sagEdgeMat); sagEdges.position.y = .92; sag.add(sagEdges);
+const core = new THREE.Group(); core.position.y = .92; sag.add(core);
+const coreWire = new THREE.Mesh(new THREE.IcosahedronGeometry(.5, 1), basic(COL.sagips, {wireframe:true, transparent:true, opacity:.9}));
+const coreInner = new THREE.Mesh(new THREE.IcosahedronGeometry(.21, 0), basic(COL.sagips.clone().lerp(WHITE, .5), {transparent:true}));
+const orbitMat = basic(COL.sagips, {transparent:true, opacity:.55});
+const orbitA = new THREE.Mesh(new THREE.TorusGeometry(.76, .012, 6, 72), orbitMat), orbitB = new THREE.Mesh(orbitA.geometry, orbitMat);
+const coreGlow = glow(COL.sagips, 2.6, .3);
+core.add(coreWire, coreInner, orbitA, orbitB, coreGlow);
+
+// SAGIPS inference plot: holographic panel (canvas texture) + 3D histogram bars
+const BINS = [50,37,28,23,50,105,31,14,12,11,11,10,10,10,10,10,10,10,10,10,10,28,25,16,11,10,10,9,9,9,8,8,8,7,7,7,6,6,6,6];
+const PL = {W:1040, H:640, PX:200, x0:130, x1:990, yb:500, yt:110};
+const binPx = k => PL.x0 + (3.3*k + 1.4)/132*(PL.x1 - PL.x0);          // bar centre, canvas px
+const binTop = k => PL.yb - BINS[k]/110*(PL.yb - PL.yt);
+function plotTexture(){
+  const c = document.createElement('canvas'); c.width = PL.W; c.height = PL.H;
+  const g = c.getContext('2d'), tex = new THREE.CanvasTexture(c);
+  const {W, H, x0, x1, yb, yt} = PL;
+  const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  const arrow = (xa, ya, xb, yb2) => {
+    g.beginPath(); g.moveTo(xa, ya); g.lineTo(xb, yb2); g.stroke();
+    const a = Math.atan2(yb2 - ya, xb - xa);
+    g.beginPath(); g.moveTo(xb, yb2); g.lineTo(xb - 14*Math.cos(a - .45), yb2 - 14*Math.sin(a - .45)); g.lineTo(xb - 14*Math.cos(a + .45), yb2 - 14*Math.sin(a + .45)); g.closePath(); g.fill();
+  };
+  const draw = () => {
+    g.clearRect(0, 0, W, H);
+    rr(6, 6, W - 12, H - 12, 22); g.fillStyle = 'rgba(10,20,36,.9)'; g.fill();
+    g.save(); g.clip(); g.fillStyle = 'rgba(34,184,232,.16)'; g.fillRect(0, 0, W, 76); g.restore();
+    rr(6, 6, W - 12, H - 12, 22); g.lineWidth = 4; g.strokeStyle = '#22b8e8'; g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#bfe9f8';
+    setFont(g, '600 34px "Barlow Semi Condensed", "Arial Narrow", sans-serif', '5px'); g.fillText('SAGIPS INFERENCE OUTPUT', W/2, 42);
+    g.strokeStyle = '#8ea3c2'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x0, yt - 12); g.lineTo(x0, yb); g.lineTo(x1 + 12, yb); g.stroke();
+    g.fillStyle = '#8ea3c2'; setFont(g, '400 23px "IBM Plex Mono", monospace');
+    [0, .25, .5, .75, 1].forEach(f => { const x = x0 + f*(x1 - x0); g.beginPath(); g.moveTo(x, yb); g.lineTo(x, yb + 12); g.stroke(); g.fillText(f.toFixed(2), x, yb + 34); });
+    g.fillStyle = '#dce7f6'; setFont(g, 'italic 400 26px "IBM Plex Mono", monospace');
+    g.fillText('M(γ₁,γ₂) [GeV/c²]', (x0 + x1)/2, yb + 82);
+    g.strokeStyle = g.fillStyle = '#dce7f6'; g.lineWidth = 2.5; g.textAlign = 'left';
+    setFont(g, 'italic 34px Georgia, "Times New Roman", serif');
+    const p0x = binPx(5), p0y = binTop(5), p1x = binPx(21), p1y = binTop(21);
+    arrow(p0x + 48, p0y + 28, p0x + 16, p0y + 6);  g.fillText('π⁰ → γγ', p0x + 56, p0y + 32);
+    arrow(p1x + 46, p1y - 56, p1x + 12, p1y - 10); g.fillText('η → γγ', p1x + 54, p1y - 60);
+    tex.needsUpdate = true;
+  };
+  onFonts(draw);
+  return tex;
+}
+const PLOT_SCALE = 1.2, PLOT_Y0 = 1.95;                                  // panel bottom sits just above the SAGIPS case
+const plotG = new THREE.Group(); plotG.position.set(SAG_OFF, PLOT_Y0 + PL.H/PL.PX*PLOT_SCALE/2, 0); plotG.userData.yaw = true; sled.add(plotG);
+const plotMat = basic(0xffffff, {map:plotTexture(), transparent:true, opacity:0, depthWrite:false});
+const plotPanel = new THREE.Mesh(new THREE.PlaneGeometry(PL.W/PL.PX, PL.H/PL.PX), plotMat); plotPanel.renderOrder = 1; plotG.add(plotPanel);
+const plotGlow = glow(COL.sagips, 7, 0); plotGlow.position.z = -.1; plotG.add(plotGlow);
+const barGeo = new THREE.BoxGeometry(1, 1, .07).translate(0, .5, 0);
+const barMat = basic(COL.buf, {transparent:true, opacity:0});
+const bars = BINS.map((h, k) => {
+  const m = new THREE.Mesh(barGeo, barMat); m.renderOrder = 2;
+  m.position.set(binPx(k)/PL.PX - PL.W/PL.PX/2, PL.H/PL.PX/2 - PL.yb/PL.PX, .05);
+  m.userData.h = (PL.yb - binTop(k))/PL.PX; m.scale.set(18.2/PL.PX, .001, 1);
+  plotG.add(m); return m;
+});
+const plotStem = dashedLine([new V3(SAG_OFF, 1.74, 0), new V3(SAG_OFF, PLOT_Y0 + .05, 0)], COL.sagips, 0, .06, .05); sled.add(plotStem);
+
+// "Theory update" upward chevron (shown after each transition)
+function theoryTexture(){
+  const c = document.createElement('canvas'); c.width = 620; c.height = 232;
+  const g = c.getContext('2d'), tex = new THREE.CanvasTexture(c);
+  const P = [[1143,530],[1143,500],[1218,477],[1293,500],[1293,530]].map(([x, y]) => [(x - 1143)*4 + 10, (y - 477)*4 + 10]);
+  const draw = () => {
+    g.clearRect(0, 0, 620, 232);
+    g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath();
+    g.fillStyle = 'rgba(11,24,40,.92)'; g.fill(); g.lineWidth = 5; g.strokeStyle = '#22b8e8'; g.stroke();
+    g.fillStyle = '#22b8e8'; g.fillRect(12, 200, 596, 20);
+    g.fillStyle = '#cdeefa'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    setFont(g, '600 46px "Barlow Semi Condensed", "Arial Narrow", sans-serif', '6px'); g.fillText('THEORY UPDATE', 310, 156);
+    tex.needsUpdate = true;
+  };
+  onFonts(draw);
+  return tex;
+}
+const theoryG = new THREE.Group(); theoryG.position.set(SAG_OFF, 2.55, 0); theoryG.userData.yaw = true; sled.add(theoryG);
+const theoryMat = basic(0xffffff, {map:theoryTexture(), transparent:true, opacity:0, depthWrite:false});
+theoryG.add(new THREE.Mesh(new THREE.PlaneGeometry(3.1, 1.16), theoryMat));
+const theoryGlow = glow(COL.sagips, 4, 0); theoryGlow.position.z = -.1; theoryG.add(theoryGlow);
+const theoryStem = dashedLine([new V3(SAG_OFF, 1.74, 0), new V3(SAG_OFF, 1.98, 0)], COL.sagips, 0, .06, .05); sled.add(theoryStem);
+
+/* ───────── HTML readouts anchored in 3D ───────── */
+const labelsEl = $('labels'), labels = [];
+function addLabel(html, anchor, cls, align, cssC){
+  const el = document.createElement('div'); el.className = 'lbl ' + (cls || ''); el.innerHTML = html;
+  if (cssC) el.style.setProperty('--c', `var(${cssC})`);
+  labelsEl.appendChild(el);
+  const L = {el, anchor, align:align || 'above', alpha:1, shown:1}; labels.push(L); return L;
+}
+function anchorAt(parent, x, y, z){ const o = new THREE.Object3D(); o.position.set(x, y, z); parent.add(o); return o; }
+function anchorPos(L, out){ const a = L.anchor; return a.isVector3 ? out.copy(a) : a.isObject3D ? a.getWorldPosition(out) : out.copy(a()); }
+
+addLabel(`<b>DAQ / Detector</b><span class="sec">beam bunch crossings</span><div class="kv"><span>CROSSINGS</span><em id="dcross">0</em></div>`,
+  new V3(DAQ_X, RING_Y + .4, -RING_R - .2), '', 'above', '--raw');
+STAGES.forEach(s => {
+  s.L = addLabel(`<b>${s.title[0]}<br>${s.title[1]}</b>${s.sub ? `<span class="sec">${s.sub}</span>` : ''}<span class="src"><i></i>TRAINING SOURCE</span>`,
+    new V3(s.x, s.top + .15, 0), 'stg', 'above', s.token);
+  s.G = addLabel(`<b>${s.short}</b> · bypassed`, new V3(s.x, 0, s.d/2 + .4), 'ghost', 'below');
+  s.G.alpha = 0;
+  if (s.rate) addLabel(s.rate, new V3(s.x, 0, RULER_Z + .7), 'rate', 'below', s.token);
+});
+addLabel('DATA RATE', new V3(STG.raw.left - .4, 0, RULER_Z), 'rate title', 'left');
+const haiL = addLabel(`<b>HAIDIS training</b><span class="role">SAGIPS model update</span><hr>
+  <div class="kv"><span>SOURCE</span><em id="hsrc">AI-ready</em></div>
+  <div class="kv"><span>STREAMS</span><em id="hstr">1</em></div>
+  <div class="kv"><span>PKTS IN</span><em id="hpk">0</em></div>`, anchorAt(haiG, -.7, 1.25, -.9), 'hai', 'above');
+const sagL = addLabel(`<b>SAGIPS model</b><span class="role">trained weights</span><hr>
+  <div class="kv"><span>VERSION</span><em id="sver">v1.0</em></div>
+  <div class="kv"><span>UPDATES</span><em id="supd">0</em></div>`, anchorAt(sag, 1.65, .55, 0), 'sag', 'right');
+const dcrossEl = $('dcross'), hsrcEl = $('hsrc'), hstrEl = $('hstr'), hpkEl = $('hpk'), sverEl = $('sver'), supdEl = $('supd');
+const captionEl = $('caption');
+
+/* ───────── sim core: pausable clock · scheduled calls · curve movers · value tweens ───────── */
+let simT = 0, paused = reduceMotion;
+const queue = [], movers = [], anims = [];
+const linear = t => t, quadInOut = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+const easeOut = t => 1 - Math.pow(1 - t, 3), easeIn = t => t*t*t;
+function after(d, fn, tag){ queue.push({t:simT + d, fn, tag}); }
+function move(obj, curve, dur, ease, orient, done, tag, cancel){ const m = {obj, curve, dur, ease, orient, done, tag, cancel, t:0}; movers.push(m); return m; }
+function anim(o){ o.t = -(o.delay || 0); o.tag = o.tag || 'chor'; anims.push(o); return o; }
+function tw(obj, key, to, dur, o = {}){
+  let from;
+  return anim({dur, delay:o.delay, tag:o.tag, ease:o.ease || quadInOut,
+    start(){ from = obj[key]; }, update(u){ obj[key] = from + (to - from)*u; }, done:o.done});
+}
+function keys(obj, key, seq, done){
+  let i = 0;
+  const next = () => { if (i >= seq.length){ done && done(); return; } const [v, d] = seq[i++]; tw(obj, key, v, d, {ease:linear, done:next}); };
+  next();
+}
+function cancelTag(tag){
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].tag === tag) queue.splice(i, 1);
+  anims.forEach(a => { if (a.tag === tag) a.dead = true; });
+  movers.forEach(m => { if (m.tag === tag && !m.dead){ m.dead = true; m.cancel && m.cancel(); } });
+}
+function compact(a){ let j = 0; for (let i = 0; i < a.length; i++) if (!a[i].dead) a[j++] = a[i]; a.length = j; }
+function runQueue(){
+  for (let guard = 0; guard < 200; guard++){
+    let bi = -1;
+    for (let i = 0; i < queue.length; i++) if (queue[i].t <= simT && (bi < 0 || queue[i].t < queue[bi].t)) bi = i;
+    if (bi < 0) return;
+    queue.splice(bi, 1)[0].fn();
+  }
+}
+
+/* ───────── choreography state ───────── */
+const S = {caption:1, plot:0, grow:0, theory:0, sagDim:0, pad:0, lane:1};
+let phase = 0, spawnActive = false, haidisFlash = 0, sagFlash = 0, pktsIn = 0, updates = 0, modelMinor = 0;
+
+// feed lanes: leg A source → HAIDIS notch (world), leg B HAIDIS tip → SAGIPS (world, at the phase's sled position)
+const lanes = []; let laneSpeed = 1;
+function rebuildLanes(i){
+  lanes.forEach(l => { scene.remove(l.base, l.flow); l.base.geometry.dispose(); l.flow.geometry.dispose(); l.baseMat.dispose(); l.flowMat.dispose(); l.ftex.dispose(); });
+  lanes.length = 0;
+  const P = PHASES[i], src = STG[P.source], sx = sledX(i), color = COL[P.source];
+  P.lanes.forEach(dz => {
+    const notch = sx - 1.75 - .4*Math.abs(dz)/1.1 - .04, tip = sx + 2.15 - .5*Math.abs(dz)/1.1 + .04;
+    const a = arc(new V3(src.right + .06, .7, dz), new V3(notch, .7, dz), .45);
+    const b = new THREE.LineCurve3(new V3(tip, .7, dz), new V3(sx + SAG_OFF - 1.6, .85, dz*.5));
+    const baseMat = basic(color, {transparent:true, opacity:.14, depthWrite:false});
+    const base = new THREE.Mesh(new THREE.TubeGeometry(a, 40, .075, 8, false), baseMat);
+    const ftex = flowTex(a.getLength()*1.4);
+    const flowMat = basic(color, {map:ftex, transparent:true, opacity:.85, depthWrite:false, blending:THREE.AdditiveBlending});
+    const flow = new THREE.Mesh(new THREE.TubeGeometry(a, 40, .04, 8, false), flowMat);
+    scene.add(base, flow);
+    lanes.push({a, aLen:a.getLength(), b, bLen:b.getLength(), base, flow, baseMat, flowMat, ftex});
+  });
+  laneSpeed = P.flow;
+}
+
+const pktGeo = new THREE.BoxGeometry(.2, .15, .38), pool = [];
+function getPacket(color){
+  let p = pool.pop();
+  if (!p){ const g = new THREE.Group(); const m = new THREE.Mesh(pktGeo, basic(0xffffff)); const h = glow(0xffffff, .9, .55); g.add(m, h); p = {g, m, h}; }
+  p.m.material.color.copy(color); p.h.material.color.copy(color); scene.add(p.g); return p;
+}
+function releasePacket(p){ if (p.g.parent){ scene.remove(p.g); pool.push(p); } }
+function launchPacket(lane, color){
+  const p = getPacket(color), drop = () => releasePacket(p);
+  move(p.g, lane.a, lane.aLen/SPEED, linear, true, () => {
+    haidisHit();
+    move(p.g, lane.b, lane.bLen/SPEED, linear, true, () => { sagHit(); releasePacket(p); }, 'chor', drop);
+  }, 'chor', drop);
+}
+function haidisHit(){ haidisFlash = 1; hpkEl.textContent = ++pktsIn; }
+function sagHit(){ sagFlash = 1; supdEl.textContent = ++updates; }
+function sendTrain(){
+  if (!spawnActive) return;
+  const P = PHASES[phase], color = COL[P.source];
+  for (let k = 0; k < T.trainPkts; k++) after(k*T.pktGap, () => { if (spawnActive) lanes.forEach(l => launchPacket(l, color)); }, 'chor');
+  if (!P.collision) after(T.trainEvery, sendTrain, 'chor');
+}
+
+// DAQ bunch crossings: flash the east detector and send a spark to Raw; in phase 3 each spark launches a train
+const sparkPool = [];
+function collide(){
+  collFlash = 1; dcrossEl.textContent = ++crossings;
+  let sp = sparkPool.pop();
+  if (!sp){ sp = new THREE.Group(); sp.add(new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), basic(0xff8a8a)), glow(COL.raw, .9, .7)); }
+  scene.add(sp);
+  move(sp, daqConn.curve, daqConn.len/SPEED, linear, false, () => {
+    scene.remove(sp); sparkPool.push(sp); STG.raw.hit = 1;
+    if (PHASES[phase].collision && spawnActive) sendTrain();
+  });
+}
+function startBunch(){ bunchOn = true; bunchT0 = simT; lastCross = -1; }
+
+function setCaption(i){ captionEl.textContent = PHASES[i].label; captionEl.style.setProperty('--c', `var(${STG[PHASES[i].source].token})`); }
+function syncStepper(){ document.querySelectorAll('[data-phase]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.phase === phase))); }
+
+/* snap every visual to the resting state of phase i */
+function setPhaseState(i){
+  phase = i; const P = PHASES[i];
+  STAGES.forEach(s => { s.sink = P.bypass.includes(s.id) ? 1 : 0; s.src = s.id === P.source ? 1 : 0; });
+  CONN.forEach(c => { c.alpha = P.bypass.includes(c.to) ? 0 : 1; });
+  sled.position.x = sledX(i);
+  rebuildLanes(i);
+  Object.assign(S, {caption:1, plot:0, grow:0, theory:0, sagDim:0, pad:0, lane:1});
+  setCaption(i); syncStepper();
+}
+function startPhase(i){
+  phase = i; const P = PHASES[i];
+  tw(STG[P.source], 'src', 1, .7);
+  setCaption(i); tw(S, 'caption', 1, .6); syncStepper();
+  hsrcEl.textContent = STG[P.source].short; hstrEl.textContent = P.lanes.length;
+  spawnActive = true;
+  if (!P.collision) after(.25, sendTrain, 'chor');
+}
+function showPlot(done){
+  const seq = [];
+  for (let k = 0; k < T.flickers; k++){ seq.push([.8, .08], [0, .08]); if (k < T.flickers - 1) seq.push([0, .06]); }
+  keys(S, 'sagDim', seq, () => {
+    sverEl.textContent = 'v1.' + (++modelMinor);
+    S.grow = 0;
+    tw(S, 'plot', 1, T.plotIn, {ease:easeOut});
+    tw(S, 'grow', 1.2, 1.2, {ease:linear});
+    after(T.plotIn + T.plotHold, () => tw(S, 'plot', 0, T.plotOut, {ease:easeIn, done}), 'chor');
+  });
+}
+function showTheoryUpdate(done){
+  keys(S, 'theory', [[1,.45],[.2,.09],[1,.09],[.15,.07],[1,.11],[.4,.08],[1,.10],[1,1.3],[0,.65]], done);
+}
+function transition(to, done){
+  const prev = PHASES[to - 1], next = PHASES[to];
+  spawnActive = false;
+  tw(S, 'caption', 0, T.labelOut);
+  tw(STG[prev.source], 'src', 0, T.glowOut);
+  const newly = next.bypass.filter(id => !prev.bypass.includes(id)).sort((a, b) => STG[b].x - STG[a].x);  // downstream first: the sled arrives from that side
+  newly.forEach((id, k) => tw(STG[id], 'sink', 1, T.sink, {delay:k*T.sinkStagger}));
+  CONN.filter(c => newly.includes(c.to)).forEach(c => tw(c, 'alpha', 0, .4));
+  tw(sled.position, 'x', sledX(to), T.slide, {delay:T.slideDelay});
+  anim({dur:T.slide, delay:T.slideDelay, update:u => { S.pad = Math.sin(Math.PI*u); }});
+  after(T.feedDelay, () => tw(S, 'lane', 0, T.feedOut, {ease:linear}), 'chor');
+  after(T.slideDelay + T.slide, () => { rebuildLanes(to); tw(S, 'lane', 1, T.feedIn, {ease:linear}); }, 'chor');   // re-route once the sled has docked
+  after(T.nextPhase, () => { startPhase(to); done && done(); }, 'chor');
+}
+function schedulePeriodicPlot(){
+  after(T.periodicPlot, () => { if (spawnActive) showPlot(schedulePeriodicPlot); }, 'chor');
+}
+function runPhase(i){
+  if (i >= 2) return;
+  after(T.phaseRun, () => {
+    spawnActive = false;
+    showPlot(() => transition(i + 1, () => {
+      showTheoryUpdate(i + 1 === 2 ? schedulePeriodicPlot : null);
+      runPhase(i + 1);
+    }));
+  }, 'chor');
+}
+function jumpTo(i){
+  cancelTag('chor'); spawnActive = false;
+  setPhaseState(i);
+  STG[PHASES[i].source].src = 0;
+  if (!bunchOn) startBunch();
+  startPhase(i);
+  if (i === 2) schedulePeriodicPlot(); else runPhase(i);
+  if (currentView === 'training' && !userMoved) goTo('training');
+}
+
+/* ───────── camera: presets + drag orbit ───────── */
+const TRAIN_DX = 2.6;
+const PRESETS = {
+  overview:{ land:{target:new V3(-3.1,1.0,-.4), theta:0, phi:52*D, r:39}, port:{target:new V3(-5,.5,0), theta:90*D, phi:40*D, r:66} },
+  detector:{ land:{target:new V3(-20.3,1,0), theta:-16*D, phi:56*D, r:16}, port:{target:new V3(-20.3,1,0), theta:-16*D, phi:50*D, r:17} },
+  pipeline:{ land:{target:new V3(-7.5,1,.6), theta:-6*D, phi:54*D, r:25}, port:{target:new V3(-7.5,1,0), theta:90*D, phi:40*D, r:26} },
+  training:() => { const t = new V3(sled.position.x + TRAIN_DX, 1.9, 0);
+    return { land:{target:t, theta:12*D, phi:58*D, r:19}, port:{target:t.clone(), theta:12*D, phi:52*D, r:20} }; },
+};
+const cam = {target:new V3(), theta:0, phi:1, r:30};
+let tween = null, currentView = Object.prototype.hasOwnProperty.call(PRESETS, Q.get('view')) ? Q.get('view') : 'overview', userMoved = false;
+function presetFor(name){
+  const P = typeof PRESETS[name] === 'function' ? PRESETS[name]() : PRESETS[name];
+  const a = camera.aspect, p = a >= 1 ? P.land : P.port;
+  let r = p.r;
+  if (a >= 1) r *= Math.pow(Math.max(1, (16/9)/a), .85);
+  else r *= Math.pow(Math.max(1, .62/a), .6) * (name === 'overview' ? 1 : 1.4);
+  return {target:p.target.clone(), theta:p.theta, phi:p.phi, r};
+}
+function goTo(name, instant){
+  currentView = name; userMoved = false;
+  document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === name)));
+  const to = presetFor(name);
+  if (instant || reduceMotion){ Object.assign(cam, to); tween = null; return; }
+  let dTheta = to.theta - cam.theta; dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+  tween = {from:{target:cam.target.clone(), theta:cam.theta, phi:cam.phi, r:cam.r}, to:Object.assign(to, {theta:cam.theta + dTheta}), t:0};
+}
+function applyCam(){
+  const s = Math.sin(cam.phi);
+  camera.position.set(cam.target.x + cam.r*s*Math.sin(cam.theta), cam.target.y + cam.r*Math.cos(cam.phi), cam.target.z + cam.r*s*Math.cos(cam.theta));
+  camera.lookAt(cam.target);
+}
+const pointers = new Map(); let pinchD = 0;
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, {x:e.clientX, y:e.clientY}); tween = null; });
+canvas.addEventListener('pointermove', e => {
+  const prev = pointers.get(e.pointerId); if (!prev) return;
+  const cur = {x:e.clientX, y:e.clientY}; pointers.set(e.pointerId, cur);
+  if (pointers.size === 1){
+    cam.theta -= (cur.x - prev.x)*.006;
+    cam.phi = Math.min(1.45, Math.max(.18, cam.phi - (cur.y - prev.y)*.005));
+  } else if (pointers.size === 2){
+    const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchD) cam.r = Math.min(85, Math.max(7, cam.r * pinchD / d));
+    pinchD = d;
+  }
+  userMoved = true; markCustom();
+});
+const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinchD = 0; };
+canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('wheel', e => { e.preventDefault(); tween = null; cam.r = Math.min(85, Math.max(7, cam.r*(1 + e.deltaY*.001))); userMoved = true; markCustom(); }, {passive:false});
+function markCustom(){ document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', 'false')); }
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.view)));
+document.querySelectorAll('[data-phase]').forEach(b => b.addEventListener('click', () => jumpTo(+b.dataset.phase)));
+
+const ppBtn = $('playpause');
+function syncPP(){ ppBtn.textContent = paused ? 'Play' : 'Pause'; ppBtn.setAttribute('aria-pressed', String(paused)); }
+ppBtn.addEventListener('click', () => { paused = !paused; syncPP(); });
+syncPP();
+
+const app = $('app');
+function resize(){
+  const w = app.clientWidth, h = app.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+  if (!userMoved) goTo(currentView, true);
+}
+addEventListener('resize', resize); resize();
+
+/* ───────── frame loop ───────── */
+const clockEl = $('clock'), tmp = new V3(), tan = new V3();
+let last = performance.now();
+
+function step(dt){
+  simT += dt;
+  runQueue();
+  for (const m of movers.slice()){
+    if (m.dead) continue;
+    m.t += dt/m.dur;
+    const u = m.ease(Math.min(1, m.t));
+    m.curve.getPointAt(u, m.obj.position);
+    if (m.orient){ m.curve.getTangentAt(u, tan); m.obj.lookAt(tmp.copy(m.obj.position).add(tan)); }
+    if (m.t >= 1){ m.dead = true; m.done && m.done(); }
+  }
+  compact(movers);
+  for (const a of anims.slice()){
+    if (a.dead) continue;
+    a.t += dt; if (a.t < 0) continue;
+    if (!a.started){ a.started = true; a.start && a.start(); }
+    const u = a.dur > 0 ? Math.min(1, a.t/a.dur) : 1;
+    a.update(a.ease ? a.ease(u) : u);
+    if (u >= 1){ a.dead = true; a.done && a.done(); }
+  }
+  compact(anims);
+  if (bunchOn){
+    const n = Math.floor((simT - bunchT0)/T.bunchPeriod - .25);   // bunch passes the east (+x) detector
+    if (n > lastCross){ lastCross = n; collide(); }
+  }
+  clockEl.textContent = `t=${simT.toFixed(1)}s`;
+}
+
+function decay(dt){
+  haidisFlash *= Math.exp(-dt*7); sagFlash *= Math.exp(-dt*5); collFlash *= Math.exp(-dt*7);
+  STAGES.forEach(s => {
+    s.hit *= Math.exp(-dt*6);
+    const src = s.src, sk = s.sink;
+    s.body.position.y = -(s.top + .4)*sk; s.body.visible = sk < .995;
+    s.footMat.opacity = .6*sk; s.foot.visible = sk > .005;
+    s.glow.material.opacity = .4*src; s.fglow.material.opacity = .45*src;
+    s.bodyMat.emissiveIntensity = .22*src + .35*s.hit;
+    if (s.discMat) s.discMat.emissiveIntensity = .25*src;
+    s.edgeMat.color.copy(COL[s.id]).lerp(WHITE, .3*src*(.6 + .4*Math.sin(simT*3)) + .5*s.hit);
+    s.L.alpha = 1 - sk; s.G.alpha = .75*sk;
+    s.L.el.classList.toggle('on', src > .5);
+  });
+  NOISE_TEX.offset.y += dt*.7;
+  CONN.forEach(c => {
+    const a = c.alpha, v = a > .01;
+    c.base.material.opacity = .32*a; c.flowMat.opacity = .6*a; c.cone.material.opacity = .7*a;
+    c.base.visible = c.flow.visible = c.cone.visible = v;
+    c.ftex.offset.x -= dt*c.rate*.9;
+  });
+  lanes.forEach(l => { l.ftex.offset.x -= dt*laneSpeed; l.flowMat.opacity = .85*S.lane; l.baseMat.opacity = .14*S.lane; l.base.visible = l.flow.visible = S.lane > .01; });
+  linkTex.offset.x -= dt*1.2;
+  // HAIDIS + SAGIPS
+  haiTop.emissiveIntensity = .45*haidisFlash; haiSide.emissiveIntensity = .06 + .5*haidisFlash;
+  haiEdgeMat.color.copy(COL.haidis).lerp(WHITE, .6*haidisFlash);
+  haiHalo.material.opacity = .1 + .45*haidisFlash;
+  pad.material.opacity = .16 + .5*S.pad;
+  haiL.el.classList.toggle('flash', haidisFlash > .35);
+  sagL.el.classList.toggle('flash', sagFlash > .35);
+  const vis = 1 - .85*S.sagDim;
+  sagEdgeMat.opacity = vis; sagEdgeMat.color.copy(COL.sagips).lerp(WHITE, .5*sagFlash);
+  glassMat.opacity = .42*vis; coreWire.material.opacity = .9*vis; coreInner.material.opacity = vis; orbitMat.opacity = .55*vis;
+  coreGlow.material.opacity = (.3 + .55*sagFlash)*vis;
+  core.scale.setScalar(1 + .28*sagFlash);
+  // plot + theory update
+  plotG.visible = S.plot > .005;
+  plotMat.opacity = S.plot; barMat.opacity = .95*S.plot; plotGlow.material.opacity = .12*S.plot; plotStem.material.opacity = .7*S.plot;
+  plotG.scale.setScalar((.9 + .1*S.plot)*PLOT_SCALE);
+  bars.forEach((b, k) => { const u = Math.min(1, Math.max(0, (S.grow - k*.012)/.5)); b.scale.y = Math.max(.001, b.userData.h*easeOut(u)); });
+  theoryG.visible = S.theory > .005;
+  theoryMat.opacity = S.theory; theoryGlow.material.opacity = .3*S.theory; theoryStem.material.opacity = .7*S.theory;
+  // DAQ
+  eastMat.emissiveIntensity = .2 + 1.2*collFlash; eastGlow.material.opacity = .9*collFlash;
+  sparkMat.opacity = .3 + .7*collFlash; ipGlow.material.opacity = .35 + .5*collFlash;
+  captionEl.style.opacity = S.caption.toFixed(3);
+}
+
+/* simT-driven idle motion (freezes with Pause) */
+function pose(){
+  const th = bunchOn ? -Math.PI/2 + 2*Math.PI*(simT - bunchT0)/T.bunchPeriod : -Math.PI/2;
+  BUNCH.forEach(b => { const a = th + b.d; b.g.position.set(RING_R*Math.cos(a), RING_Y, RING_R*Math.sin(a)); });
+  STAGES.forEach(s => {
+    if (s.scan) s.scan.position.y = .03 + (s.h - .06)*(((simT*.45 + s.x*.07) % 1 + 1) % 1);
+    if (s.spin) s.spin.rotation.y = simT*.25;
+    if (s.nodes) s.nodes.forEach(n => { const k = Math.max(0, Math.sin(simT*3.2 - n.li*1.1)); n.m.material.color.copy(COL.ai).lerp(WHITE, .6*k*k); });
+  });
+  haiG.position.y = .04*Math.sin(simT*1.7);
+  coreWire.rotation.set(simT*.23, simT*.5, 0);
+  orbitA.rotation.set(Math.PI/2 + .45, 0, simT*.9);
+  orbitB.rotation.set(.35, simT*.7, Math.PI/2);
+}
+
+function placeLabels(){
+  const w = app.clientWidth, h = app.clientHeight;
+  for (const L of labels){
+    if (L.alpha < .01){ L.el.hidden = true; continue; }
+    anchorPos(L, tmp).project(camera);
+    if (tmp.z > 1 || tmp.z < -1){ L.el.hidden = true; continue; }
+    L.el.hidden = false;
+    if (L.shown !== L.alpha){ L.el.style.opacity = L.alpha >= .999 ? '' : L.alpha.toFixed(3); L.shown = L.alpha; }
+    const x = (tmp.x*.5 + .5)*w, y = (-tmp.y*.5 + .5)*h;
+    const t = L.align === 'right' ? 'translate(10px,-50%)' : L.align === 'left' ? 'translate(calc(-100% - 10px),-50%)' : L.align === 'below' ? 'translate(-50%,10px)' : 'translate(-50%,calc(-100% - 8px))';
+    L.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) ${t}`;
+  }
+}
+
+function frame(now){
+  const dt = Math.min(.05, (now - last)/1000); last = now;
+  if (tween){
+    tween.t = Math.min(1, tween.t + dt/1.2); const e = quadInOut(tween.t);
+    cam.target.lerpVectors(tween.from.target, tween.to.target, e);
+    cam.theta = tween.from.theta + (tween.to.theta - tween.from.theta)*e;
+    cam.phi = tween.from.phi + (tween.to.phi - tween.from.phi)*e;
+    cam.r = tween.from.r + (tween.to.r - tween.from.r)*e;
+    if (tween.t >= 1) tween = null;
+  } else if (currentView === 'training' && !userMoved){        // follow the sled as it moves upstream
+    cam.target.x += (sled.position.x + TRAIN_DX - cam.target.x)*Math.min(1, dt*3);
+  }
+  applyCam();
+  if (!paused) step(dt);
+  decay(paused ? 0 : dt);
+  pose();
+  scene.traverse(o => {
+    if (o.userData.yaw){ o.getWorldPosition(tmp); o.rotation.y = Math.atan2(camera.position.x - tmp.x, camera.position.z - tmp.z); }
+  });
+  renderer.render(scene, camera);
+  placeLabels();
+  requestAnimationFrame(frame);
+}
+
+/* ───────── boot: same event chain as the 2D original ───────── */
+const qPhase = parseInt(Q.get('phase'), 10);
+if (qPhase >= 1 && qPhase <= 3) jumpTo(qPhase - 1);
+else {
+  setPhaseState(0); STG.ai.src = reduceMotion ? 1 : 0;      // reduced motion starts paused: show the source lit
+  after(T.start, () => { startBunch(); startPhase(0); runPhase(0); }, 'chor');
+}
+goTo(currentView, true);
+const seek = parseFloat(Q.get('seek')) || 0;                 // ?seek=<s> fast-forwards (handy for screenshots)
+for (let t = 0; t < seek; t += 1/30){ step(1/30); decay(1/30); }
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
