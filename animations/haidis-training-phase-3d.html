@@ -1,0 +1,747 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>HAIDIS Training Phase 3D (Copy)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL stage laid out as a left-to-right pipeline in four floor bands
+   (ingest → distribute → train → register). HUD top corners; live readouts float on 3D anchors.
+   Deliberately single-theme: an instrument-room dark stage so emissive packets read. */
+:root{
+  --bg:#0c1524;
+  --floor:#101c2e;
+  --panel:rgba(13,22,38,.84);
+  --line:#263a59;
+  --fg:#dce7f6;
+  --muted:#8ea3c2;
+  --s1:#22b8e8;
+  --s2:#ff7a3d;
+  --lb:#e2b13c;
+  --worker:#7ea2d6;
+  --ring:#b65ae6;
+  --snap:#2fd48a;
+  --ready:#9cbbe0;
+  --buf:#5b8fd0;
+  --warn:#e8912e;
+  --crit:#e5484d;
+  --track:#1b2a43;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --lfs:clamp(8px,.72vw,11.5px);
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden}
+body{font-family:var(--display)}
+#app{position:fixed;inset:0;background:var(--bg)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+
+/* ── floating readouts ── */
+.lbl{position:absolute;left:0;top:0;will-change:transform;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--c,var(--line));border-radius:3px;
+  padding:.5em .7em .55em;font:400 var(--lfs)/1.4 var(--mono);color:var(--muted);white-space:nowrap;
+  font-variant-numeric:tabular-nums;backdrop-filter:blur(3px)}
+.lbl b{display:block;font:600 1.22em/1.2 var(--display);letter-spacing:.09em;color:var(--fg);text-transform:uppercase}
+.lbl .role{color:var(--fg);opacity:.8}
+.lbl span{display:block}
+.lbl hr{border:0;border-top:1px solid var(--line);margin:.4em 0}
+.kv{display:flex;justify-content:space-between;gap:1.2em}
+.kv em{font-style:normal;color:var(--fg);font-weight:500}
+.bar{flex:none;width:7em;height:.55em;background:var(--track);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--buf)}
+.meter{display:flex;align-items:center;gap:.5em;margin-top:.25em}
+.meter>span:first-child{min-width:3.6em}
+.meter em{font-style:normal;min-width:3ch;text-align:right}
+.meter.ckpt{color:var(--snap)}
+.meter.ckpt .bar i{background:var(--snap)}
+.lbl.wk{padding:.35em .55em .4em}
+.lbl.wk .bar{width:3.6em}
+.lbl.wk .meters{display:flex;gap:1.1em}
+.lbl.wk .meter>span:first-child{min-width:0}
+.lbl.wk b{display:flex;justify-content:space-between;align-items:baseline;gap:.8em}
+.lbl.wk b small{font:400 .78em/1 var(--mono);letter-spacing:0;color:var(--muted);text-transform:none}
+.dist{display:grid;grid-template-columns:auto 11em;gap:.25em .5em;align-items:center;margin:.2em 0 .1em}
+.dist .bar{width:100%}
+.dist .bar i{transition:width .6s cubic-bezier(.2,.7,.3,1)}
+.cap{letter-spacing:.08em}
+.status{display:flex;align-items:center;gap:.5em;color:var(--snap)}
+.dot{width:.7em;height:.7em;border-radius:50%;background:var(--snap);transition:transform .12s,box-shadow .12s}
+.dot.hot{transform:scale(1.45);box-shadow:0 0 .8em var(--snap)}
+.lbl.lb{--c:var(--lb)}
+.lbl.hub{--c:var(--snap)}
+.lbl.hub em{color:var(--snap)}
+.lbl.flash{border-color:var(--c)}
+.lbl.group{--c:var(--ring);color:var(--fg);letter-spacing:.06em}
+.lbl.group span{color:var(--ring)}
+.lbl.ringtag{border-left-color:var(--ring);color:var(--ring);padding:.25em .6em;letter-spacing:.12em}
+.lbl.tag{--c:var(--snap);color:var(--snap);padding:.15em .5em;letter-spacing:.06em}
+.log{display:grid;gap:.15em;margin-top:.2em}
+.log span{display:flex;justify-content:space-between;gap:1.2em}
+.log span:first-child{color:var(--snap)}
+.log i{font-style:normal}
+/* stage markers painted on the floor */
+.stage{position:absolute;left:0;top:0;will-change:transform;white-space:nowrap;text-align:center;
+  font:600 clamp(11px,1.05vw,16px)/1.1 var(--display);letter-spacing:.18em;text-transform:uppercase;color:var(--fg);opacity:.85}
+.stage i{font-style:normal;display:inline-grid;place-items:center;width:1.6em;height:1.6em;margin-right:.5em;border-radius:50%;
+  border:1px solid var(--muted);font-size:.85em;letter-spacing:0;color:var(--fg)}
+.stage small{display:block;margin-top:.35em;font:400 .72em/1 var(--mono);letter-spacing:.06em;text-transform:none;color:var(--muted)}
+
+/* ── HUD ── */
+.hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;
+  padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 24px;flex-wrap:wrap}
+.row.bottom{justify-content:flex-end;align-items:flex-end}
+.head{max-width:46ch;min-width:0}
+.eyebrow{margin:0;font:500 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--lb)}
+h1{margin:.3em 0 .25em;font:700 clamp(24px,2.6vw,38px)/1 var(--display);letter-spacing:.04em;text-transform:uppercase;text-wrap:balance}
+.sub{margin:0;font:400 clamp(11px,.9vw,13px)/1.5 var(--mono);color:var(--muted)}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:0}
+.ctrl{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;pointer-events:auto}
+.ctrl button{font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:9px 12px;cursor:pointer;
+  transition:color .15s,border-color .15s,background .15s}
+.ctrl button:hover{color:var(--fg);border-color:var(--muted)}
+.ctrl button[aria-pressed="true"]{color:var(--bg);background:var(--fg);border-color:var(--fg)}
+.ctrl button:focus-visible{outline:2px solid var(--lb);outline-offset:2px}
+.ctrl .sep{width:1px;background:var(--line);margin:0 4px}
+.legend{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:9px 13px;
+  display:grid;grid-template-columns:repeat(2,auto);gap:7px 20px;font:400 11px/1.2 var(--mono);color:var(--fg);min-width:0}
+.legend div{display:flex;align-items:center;gap:8px}
+.legend svg{flex:none;width:24px;height:14px}
+.foot{display:flex;align-items:flex-end;gap:16px;font:400 11px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+#clock{color:var(--fg)}
+
+@media (max-width:720px){
+  .lbl .sec{display:none}
+  .side{align-items:stretch;width:100%}
+  .ctrl{justify-content:flex-start}
+  .legend{grid-template-columns:repeat(2,minmax(0,1fr));font-size:10px;gap:6px 12px;padding:8px 10px}
+  .legend div{white-space:normal}
+  .sub,.hint,.stage small{display:none}
+  .row.bottom{justify-content:flex-start}
+}
+@media (max-height:560px){ .legend,.sub{display:none} }
+</style>
+
+<div id="app">
+  <canvas id="scene" role="img" aria-label="3D animation laid out left to right: two GlueX data senders stream UDP packet trains into an EJFAT FPGA load balancer, which distributes them round-robin to a training group of five ERSAP plus SAGIPS workers joined by an MPI ring that circulates model weights; each worker writes model checkpoints that flow right into the AmSC MLFlow registry."></canvas>
+  <div id="labels" aria-hidden="true"></div>
+
+  <div class="hud">
+    <div class="row">
+      <header class="head">
+        <p class="eyebrow">HAIDIS · Jefferson Lab</p>
+        <h1>Training Phase</h1>
+        <p class="sub">2 GlueX data senders → EJFAT load balancer → 5 ERSAP + SAGIPS workers training together over an MPI ring → model snapshots to the AmSC MLFlow registry</p>
+      </header>
+      <div class="side">
+        <nav class="ctrl" aria-label="View controls">
+          <button type="button" id="v-overview" data-view="overview" aria-pressed="true">Overview</button>
+          <button type="button" id="v-lb" data-view="lb" aria-pressed="false">Ingest</button>
+          <button type="button" id="v-ring" data-view="ring" aria-pressed="false">Workers</button>
+          <button type="button" id="v-reg" data-view="reg" aria-pressed="false">Registry</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" id="playpause" aria-pressed="false">Pause</button>
+        </nav>
+        <aside class="legend" aria-label="Legend">
+          <div><svg viewBox="0 0 24 14"><rect x="5" y="3" width="14" height="8" rx="1.5" fill="var(--s1)"/></svg>GlueX Data 1</div>
+          <div><svg viewBox="0 0 24 14"><rect x="5" y="3" width="14" height="8" rx="1.5" fill="var(--s2)"/></svg>GlueX Data 2</div>
+          <div><svg viewBox="0 0 24 14"><path d="M12 1 L18 7 L12 13 L6 7 Z" fill="var(--ring)"/></svg>Model weights (ring)</div>
+          <div><svg viewBox="0 0 24 14"><line x1="1" y1="7" x2="23" y2="7" stroke="var(--ready)" stroke-width="1.5" stroke-dasharray="4 3"/><circle cx="12" cy="7" r="3.5" fill="var(--bg)" stroke="var(--ready)" stroke-width="1.4"/></svg>Ready signal (to LB)</div>
+          <div><svg viewBox="0 0 24 14"><rect x="2" y="3" width="20" height="8" rx="4" fill="none" stroke="var(--ring)" stroke-width="1.8"/></svg>MPI rank communications</div>
+          <div><svg viewBox="0 0 24 14"><path d="M5 2 H11 L14 5 V12 H5 Z" fill="var(--snap)"/><line x1="15" y1="7" x2="23" y2="7" stroke="var(--snap)" stroke-dasharray="2 2"/></svg>Model snapshot → registry</div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="row bottom">
+      <div class="foot">
+        <span class="hint">Drag to orbit · scroll or pinch to zoom</span>
+        <span id="clock">t=0.0s</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+(function(){
+const V3 = THREE.Vector3;
+const css = getComputedStyle(document.documentElement);
+const tok = n => new THREE.Color(css.getPropertyValue(n).trim());
+const COL = {
+  bg: tok('--bg'), floor: tok('--floor'),
+  s1: tok('--s1'), s2: tok('--s2'), lb: tok('--lb'), worker: tok('--worker'),
+  ring: tok('--ring'), snap: tok('--snap'), ready: tok('--ready'),
+  buf: tok('--buf'), warn: tok('--warn'), crit: tok('--crit'),
+};
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ───────── renderer / scene ───────── */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = COL.bg.clone();
+scene.fog = new THREE.Fog(COL.bg.getHex(), 45, 90);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 220);
+
+scene.add(new THREE.HemisphereLight(0xa8c0e8, 0x0a1220, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(4, 24, 16);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 1024);
+Object.assign(sun.shadow.camera, {left:-28, right:28, top:16, bottom:-16, near:1, far:70});
+scene.add(sun);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 90),
+  new THREE.MeshStandardMaterial({color:COL.floor, roughness:.95, metalness:0}));
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(140, 140, 0x22344f, 0x172539);
+grid.position.y = 0.005; grid.material.transparent = true; grid.material.opacity = .5; scene.add(grid);
+
+/* ───────── helpers ───────── */
+function glowTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), r = g.createRadialGradient(32,32,0,32,32,32);
+  r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.25,'rgba(255,255,255,.55)'); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+const GLOW = glowTexture();
+function glow(color, size, opacity){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW, color, transparent:true, opacity, blending:THREE.AdditiveBlending, depthWrite:false}));
+  s.scale.set(size, size, 1); return s;
+}
+function std(color, o={}){ return new THREE.MeshStandardMaterial(Object.assign({color, roughness:.55, metalness:.35}, o)); }
+function basic(color, o={}){ return new THREE.MeshBasicMaterial(Object.assign({color}, o)); }
+function tube(curve, r, color, opacity){
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 80, r, 6, false), basic(color, {transparent:true, opacity, depthWrite:false}));
+}
+function dashed(curve, color, opacity, dash=.28, gap=.22){
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(90)),
+    new THREE.LineDashedMaterial({color, dashSize:dash, gapSize:gap, transparent:true, opacity}));
+  l.computeLineDistances(); return l;
+}
+function arc(a, b, lift){
+  const m = a.clone().lerp(b, .5); m.y = Math.max(a.y, b.y) + lift;
+  return new THREE.CatmullRomCurve3([a, m, b], false, 'centripetal');
+}
+const PAGE_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 80;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.beginPath();
+  g.moveTo(4,4); g.lineTo(44,4); g.lineTo(60,20); g.lineTo(60,76); g.lineTo(4,76); g.closePath(); g.fill();
+  g.globalCompositeOperation = 'destination-out';
+  g.fillRect(14,32,36,4); g.fillRect(14,44,36,4); g.fillRect(14,56,24,4);
+  g.beginPath(); g.moveTo(44,4); g.lineTo(44,20); g.lineTo(60,20); g.lineWidth = 3; g.stroke();
+  return new THREE.CanvasTexture(c);
+})();
+const PAGE_GEO = new THREE.PlaneGeometry(.5, .62);
+const FLOW_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 4;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0,0,40,0);
+  gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(255,255,255,1)');
+  g.fillStyle = gr; g.fillRect(0,0,40,4);
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t;
+})();
+
+/* ───────── layout: one axis, four stages, left → right ───────── */
+const STAGES = [
+  {n:1, name:'Ingest',     sub:'GlueX data senders', x0:-24,  x1:-13.5, cx:-19},
+  {n:2, name:'Distribute', sub:'EJFAT load balancer', x0:-13.5, x1:-1,  cx:-8},
+  {n:3, name:'Train',      sub:'5 MPI ranks, one model', x0:-1, x1:10.5, cx:4.2},
+  {n:4, name:'Register',   sub:'AmSC MLFlow',       x0:10.5,  x1:22,   cx:16},
+];
+const STAGE_Z = 13.5;
+const LB_POS = new V3(-8, 0, 0);
+const CL = {x:4.2, rail0:2.2, rail1:6.2, zs:[-9.2,-4.6,0,4.6,9.2]};   // training group geometry
+const RING_Y = .2;
+const REG = new V3(16, 0, 0);
+
+// floor bands + chevrons between stages
+STAGES.forEach((s, i) => {
+  const band = new THREE.Mesh(new THREE.PlaneGeometry(s.x1 - s.x0 - .3, 32),
+    basic(i % 2 ? 0x13223a : 0x0f1b2e, {transparent:true, opacity:.75, depthWrite:false}));
+  band.rotation.x = -Math.PI/2; band.position.set((s.x0 + s.x1)/2, .008, 0); scene.add(band);
+  if (i < STAGES.length - 1){
+    const sh = new THREE.Shape(); sh.moveTo(-.5, .7); sh.lineTo(.4, 0); sh.lineTo(-.5, -.7); sh.lineTo(-.2, 0); sh.closePath();
+    const ch = new THREE.Mesh(new THREE.ShapeGeometry(sh), basic(0x8ea3c2, {transparent:true, opacity:.5, side:THREE.DoubleSide}));
+    ch.rotation.x = -Math.PI/2; ch.position.set(s.x1, .012, STAGE_Z); scene.add(ch);
+  }
+});
+// spine: a faint floor track along the processing direction
+const spine = new THREE.Mesh(new THREE.PlaneGeometry(42, .06), basic(0x8ea3c2, {transparent:true, opacity:.35}));
+spine.rotation.x = -Math.PI/2; spine.position.set(-1, .011, STAGE_Z); scene.add(spine);
+
+/* ───────── 1 · senders ───────── */
+const SENDERS = {
+  s1:{name:'GLUEX DATA 1', ip:'10.0.1.10 : 19522', pos:new V3(-19,0,-3.6), color:COL.s1, cssVar:'--s1', lbZ:-.9},
+  s2:{name:'GLUEX DATA 2', ip:'10.0.1.11 : 19522', pos:new V3(-19,0, 3.6), color:COL.s2, cssVar:'--s2', lbZ: .9},
+};
+Object.values(SENDERS).forEach(s => {
+  const g = new THREE.Group(); g.position.copy(s.pos);
+  const geo = new THREE.BoxGeometry(1.8, 3.0, 1.8);
+  const body = new THREE.Mesh(geo, std(0x18263d)); body.position.y = 1.5; body.castShadow = true; g.add(body);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:s.color}));
+  edges.position.y = 1.5; g.add(edges);
+  s.ports = [];
+  [0.8, 1.5, 2.2].forEach(y => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(.06, .16, 1.2), basic(s.color));
+    p.position.set(.92, y, 0); g.add(p); s.ports.push(p);
+  });
+  s.halo = glow(s.color, 2.2, .35); s.halo.position.set(1.05, 1.1, 0); g.add(s.halo);
+  scene.add(g);
+  const port = s.pos.clone().add(new V3(1.0, 1.1, 0));
+  const lbIn = new V3(LB_POS.x - 2.1, .62, s.lbZ);
+  s.curve = arc(port, lbIn, .8); s.len = s.curve.getLength();
+  scene.add(tube(s.curve, .045, s.color, .38));
+  s.flash = 0;
+});
+
+/* ───────── 2 · load balancer (FPGA on a carrier board) ───────── */
+function boardTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0d2621'; g.fillRect(0,0,512,512);
+  g.strokeStyle = 'rgba(226,177,60,.38)'; g.lineWidth = 2.2; g.lineCap = 'round';
+  const lo = 118, hi = 394; let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 64; i++){
+    const side = i % 4, t = lo + 12 + rnd()*(hi-lo-24);
+    let x, y, dx, dy;
+    if (side === 0){ x = t; y = lo; dx = 0; dy = -1; } else if (side === 1){ x = hi; y = t; dx = 1; dy = 0; }
+    else if (side === 2){ x = t; y = hi; dx = 0; dy = 1; } else { x = lo; y = t; dx = -1; dy = 0; }
+    const a = 14 + rnd()*40, bend = (rnd() < .5 ? -1 : 1) * (10 + rnd()*30);
+    const x1 = x + dx*a, y1 = y + dy*a, x2 = x1 + (dy ? bend : 0), y2 = y1 + (dx ? bend : 0);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x1, y1); g.lineTo(x2 + dx*20, y2 + dy*20); g.lineTo(x2 + dx*200, y2 + dy*200); g.stroke();
+    g.fillStyle = 'rgba(226,177,60,.55)'; g.beginPath(); g.arc(x2 + dx*20, y2 + dy*20, 3, 0, 7); g.fill();
+  }
+  const tx = new THREE.CanvasTexture(c); tx.anisotropy = 4; return tx;
+}
+function lidTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0,0,256,256); gr.addColorStop(0,'#9aa3b2'); gr.addColorStop(1,'#646d7c');
+  g.fillStyle = gr; g.fillRect(0,0,256,256);
+  g.strokeStyle = 'rgba(20,28,40,.35)'; g.lineWidth = 3; g.strokeRect(14,14,228,228);
+  g.fillStyle = '#1a2230'; g.font = '700 54px "Barlow Semi Condensed", Arial Narrow, sans-serif'; g.textAlign = 'center';
+  g.fillText('EJFAT', 128, 120);
+  g.font = '500 22px "IBM Plex Mono", monospace'; g.fillText('LB · FPGA', 128, 160);
+  g.beginPath(); g.arc(34, 222, 7, 0, 7); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+const lbGroup = new THREE.Group(); lbGroup.position.copy(LB_POS); scene.add(lbGroup);
+const boardSide = std(0x0d2621);
+const board = new THREE.Mesh(new THREE.BoxGeometry(6.6, .18, 6.6),
+  [boardSide,boardSide,std(0xffffff,{map:boardTexture(), roughness:.8, metalness:.1}),boardSide,boardSide,boardSide]);
+board.position.y = .09; board.receiveShadow = true; board.castShadow = true; lbGroup.add(board);
+const pkgGeo = new THREE.BoxGeometry(3.8, .26, 3.8);
+const pkg = new THREE.Mesh(pkgGeo, std(0x1a2230, {roughness:.7})); pkg.position.y = .31; pkg.castShadow = true; lbGroup.add(pkg);
+const pkgEdge = new THREE.LineSegments(new THREE.EdgesGeometry(pkgGeo), new THREE.LineBasicMaterial({color:COL.lb}));
+pkgEdge.position.y = .31; lbGroup.add(pkgEdge);
+const lidMat = std(0xffffff, {map:lidTexture(), metalness:.75, roughness:.32, emissive:COL.lb, emissiveIntensity:0});
+const lidSide = std(0x7d8696, {metalness:.8, roughness:.35});
+const lid = new THREE.Mesh(new THREE.BoxGeometry(2.6, .3, 2.6), [lidSide,lidSide,lidMat,lidSide,lidSide,lidSide]);
+lid.position.y = .59; lid.castShadow = true; lbGroup.add(lid);
+const lbHalo = glow(COL.lb, 5, 0); lbHalo.position.y = .9; lbGroup.add(lbHalo);
+let lbFlash = 0;
+
+/* ───────── 3 · training group: 5 workers on a shared platform, joined by the MPI ring ───────── */
+const platGeo = new THREE.BoxGeometry(CL.rail1 - CL.rail0 + 1.6, .12, (CL.zs[4] - CL.zs[0]) + (CL.rail1 - CL.rail0) + 1.6);
+const plat = new THREE.Mesh(platGeo, std(0x1a1730, {roughness:.85, metalness:.15}));
+plat.position.set(CL.x, .06, 0); plat.receiveShadow = true; scene.add(plat);
+const platEdge = new THREE.LineSegments(new THREE.EdgesGeometry(platGeo), new THREE.LineBasicMaterial({color:COL.ring, transparent:true, opacity:.45}));
+platEdge.position.copy(plat.position); scene.add(platEdge);
+
+// MPI ring as a racetrack: rank 1 → 5 along the outlet rail, return W5 → W1 along the inlet rail
+const ringPts = [];
+const rad = (CL.rail1 - CL.rail0)/2, zTop = CL.zs[0], zBot = CL.zs[4];
+for (let k = 0; k <= 16; k++) ringPts.push(new V3(CL.rail1, RING_Y, zTop + (zBot - zTop)*k/16));
+for (let k = 1; k < 12; k++){ const a = Math.PI*k/12; ringPts.push(new V3(CL.x + rad*Math.cos(a), RING_Y, zBot + rad*Math.sin(a))); }
+for (let k = 0; k <= 16; k++) ringPts.push(new V3(CL.rail0, RING_Y, zBot - (zBot - zTop)*k/16));
+for (let k = 1; k < 12; k++){ const a = Math.PI + Math.PI*k/12; ringPts.push(new V3(CL.x + rad*Math.cos(a), RING_Y, zTop + rad*Math.sin(a))); }
+const ringCurve = new THREE.CatmullRomCurve3(ringPts, true, 'centripetal');
+scene.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve, 300, .06, 8, true), basic(COL.ring, {transparent:true, opacity:.75})));
+scene.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve, 300, .18, 8, true), basic(COL.ring, {transparent:true, opacity:.09, blending:THREE.AdditiveBlending, depthWrite:false})));
+const RING_PERIOD = 5.0, NUM_DIAMONDS = 4, diamonds = [];
+for (let k = 0; k < NUM_DIAMONDS; k++){
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.OctahedronGeometry(.26), basic(COL.ring)); m.scale.y = 1.3; m.position.y = .2; g.add(m);
+  const h = glow(COL.ring, 1.3, .55); h.position.y = .2; g.add(h);
+  scene.add(g); diamonds.push({g, m, phase:k/NUM_DIAMONDS});
+}
+
+const CKPT_X = CL.rail1 + .15, CKPT_Y = 1.55;
+const workers = CL.zs.map((z, i) => {
+  const pos = new V3(CL.x, .12, z);
+  const g = new THREE.Group(); g.position.copy(pos); scene.add(g);
+  const geo = new THREE.BoxGeometry(2.6, .8, 2.2);
+  const body = new THREE.Mesh(geo, std(0x18243a)); body.position.y = .4; body.castShadow = true; g.add(body);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:COL.worker}));
+  edges.position.y = .4; g.add(edges);
+  for (let k = 0; k < 6; k++){ // GPU heat-sink fins
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(.06, .14, 1.7), basic(0x2b3f60));
+    fin.position.set(-.9 + k*.36, .87, 0); g.add(fin);
+  }
+  // buffer gauge on the front face (fills left → right)
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(2.2, .2, .1), std(0x9cbbe0, {transparent:true, opacity:.16, depthWrite:false}));
+  glass.position.set(0, .4, 1.14); g.add(glass);
+  const fillGeo = new THREE.BoxGeometry(1, .14, .12); fillGeo.translate(.5, 0, 0);
+  const fill = new THREE.Mesh(fillGeo, basic(COL.buf.clone(), {transparent:true, opacity:.95}));
+  fill.position.set(-1.1, .4, 1.14); fill.scale.x = .001; g.add(fill);
+  // rank → ring tap on the outlet side
+  const tap = new THREE.Mesh(new THREE.BoxGeometry(CL.rail1 - (CL.x + 1.3), .05, .14), basic(COL.ring, {transparent:true, opacity:.7}));
+  tap.position.set((CL.rail1 + CL.x + 1.3)/2 - CL.x, RING_Y - .12 + .02, 0); g.add(tap);
+
+  // inbound: LB fan-out link; outbound to LB: ready signal (low and dim)
+  const start = new V3(LB_POS.x + 2.0, .62, -1.2 + i*.6);
+  const end = new V3(CL.x - 1.3, .55, z).add(new V3(0, .12, 0));
+  const curve = arc(start, end, 1.4 + start.distanceTo(end)*.05);
+  scene.add(tube(curve, .03, 0x4f6f99, .55));
+  const rStart = new V3(CL.x - 1.3, .3, z + .45), rEnd = new V3(LB_POS.x + 2.0, .4, -1.05 + i*.6);
+  const rCurve = arc(rStart, rEnd, .35);
+  scene.add(dashed(rCurve, COL.ready, .32));
+
+  // outbound: this rank's checkpoints flow right into the registry
+  const top = new V3(CKPT_X, CKPT_Y, z);
+  const regIn = new V3(REG.x - 1.35, 1.25, z*.12);
+  const ctrl = top.clone().lerp(regIn, .5).add(new V3(0, 1.0, 0));
+  const save = new THREE.QuadraticBezierCurve3(top, ctrl, regIn);
+  const flowTex = FLOW_TEX.clone(); flowTex.needsUpdate = true; flowTex.repeat.set(save.getLength()*1.2, 1);
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(save, 60, .05, 6, false),
+    basic(COL.snap, {map:flowTex, transparent:true, opacity:.6, depthWrite:false, blending:THREE.AdditiveBlending})));
+  const page = new THREE.Group(); page.position.copy(top); page.userData.billboard = true;
+  const pageMesh = new THREE.Mesh(PAGE_GEO, basic(COL.snap, {map:PAGE_TEX, transparent:true, opacity:.4, depthWrite:false}));
+  const pageGlow = glow(COL.snap, 1.6, 0);
+  page.add(pageGlow, pageMesh); scene.add(page);
+  // short riser so the checkpoint visibly comes out of the worker
+  const riser = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, CKPT_Y - .5, 6), basic(COL.snap, {transparent:true, opacity:.35}));
+  riser.position.set(CKPT_X, .5 + (CKPT_Y - .5)/2 - .25, z); scene.add(riser);
+
+  return {i, pos, edges, fill, curve, len:curve.getLength(), rCurve, rLen:rCurve.getLength(), save,
+          flowTex, page, pageMesh, pageGlow, ck:{prev:0, next:1},
+          level:0, shown:0, flash:0, ip:`10.0.2.${10+i} : 19530`};
+});
+
+/* ───────── 4 · AmSC MLFlow registry ───────── */
+const hub = new THREE.Group(); hub.position.copy(REG); scene.add(hub);
+const ped = new THREE.Mesh(new THREE.BoxGeometry(3.4, .2, 3.4), std(0x10241d, {roughness:.85}));
+ped.position.y = .1; ped.receiveShadow = true; hub.add(ped);
+const stack = new THREE.Group(); hub.add(stack);
+const hubRims = [];
+for (let k = 0; k < 4; k++){
+  const d = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, .3, 48), std(0x123a2d, {metalness:.4, roughness:.45}));
+  d.position.y = .4 + k*.42; d.castShadow = true; stack.add(d);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.21, .025, 6, 64), basic(COL.snap.clone(), {transparent:true, opacity:.75}));
+  rim.rotation.x = Math.PI/2; rim.position.y = .4 + k*.42 + .15; stack.add(rim); hubRims.push(rim);
+}
+const hubHalo = glow(COL.snap, 5, .12); hubHalo.position.y = 1.1; hub.add(hubHalo);
+let hubFlash = 0; const pulses = [];
+
+/* ───────── HTML readouts anchored in 3D ───────── */
+const labelsEl = document.getElementById('labels');
+const labels = [];
+function addLabel(html, anchor, cls, align, cssC){
+  const el = document.createElement('div'); el.className = (cls === 'stage' ? 'stage' : 'lbl ' + (cls||'')); el.innerHTML = html;
+  if (cssC) el.style.setProperty('--c', `var(${cssC})`);
+  labelsEl.appendChild(el); labels.push({el, anchor, align: align || 'above'}); return el;
+}
+function removeLabel(el){ const i = labels.findIndex(L => L.el === el); if (i >= 0) labels.splice(i, 1); el.remove(); }
+
+STAGES.forEach(s => addLabel(`<i>${s.n}</i>${s.name}<small>${s.sub}</small>`, new V3(s.cx, 0, STAGE_Z + .9), 'stage', 'below'));
+
+Object.values(SENDERS).forEach(s => {
+  addLabel(`<b>${s.name}</b><span>${s.ip}</span><span class="sec">UDP · 10 Gb/s</span><span class="sec">9000-byte frames</span>`,
+    s.pos.clone().add(new V3(0, 3.15, 0)), '', 'above', s.cssVar);
+});
+addLabel(`<b>Load balancer</b><span class="role">EJFAT · FPGA</span><hr>
+  <div class="kv"><span>PKT IN <em id="pin">0</em></span><span>PKT OUT <em id="pout">0</em></span></div><hr>
+  <span class="cap sec">DISTRIBUTION</span>
+  <div class="dist sec">${[1,2,3,4,5].map(n=>`<span>W${n}</span><span class="bar"><i id="d${n}"></i></span>`).join('')}</div>
+  <hr class="sec"><span class="cap sec">ALGO: ROUND-ROBIN + BACKPRESSURE</span>
+  <span class="status"><i class="dot" id="lbdot"></i>ACTIVE</span>`,
+  LB_POS.clone().add(new V3(0, 1.0, -3.0)), 'lb', 'above');
+addLabel(`TRAINING GROUP<span>ERSAP + SAGIPS · 5 MPI ranks</span>`, new V3(CL.x, .2, CL.zs[0] - rad - .5), 'group', 'above');
+addLabel('MODEL WEIGHTS · MPI RING', new V3(CL.rail0 - .4, RING_Y, (CL.zs[3] + CL.zs[4])/2), 'ringtag', 'left');
+workers.forEach(w => {
+  w.el = addLabel(`<b>Worker ${w.i+1}<small class="sec">${w.ip}</small></b>
+    <div class="meters"><div class="meter"><span>BUF</span><span class="bar"><i></i></span><em>0%</em></div>
+    <div class="meter ckpt"><span>CKPT</span><span class="bar"><i></i></span><em>0%</em></div></div>`,
+    new V3(CL.x, .12, w.pos.z + 1.2), 'wk', 'below', '--worker');
+  const [b1, b2] = w.el.querySelectorAll('.bar i'), [p1, p2] = w.el.querySelectorAll('.meter em');
+  w.barEl = b1; w.pctEl = p1; w.ckBar = b2; w.ckPct = p2;
+});
+const hubEl = addLabel(`<b>AmSC MLFlow</b><span class="role">Model Registry</span><hr>
+  <div class="kv"><span>VERSION</span><em id="ver">v0</em></div><div class="kv"><span>SAVES</span><em id="saves">0</em></div>
+  <hr><span class="cap">LATEST SAVES</span><div class="log" id="log"><span>waiting for workers…</span></div>`,
+  REG.clone().add(new V3(0, 2.4, -1.6)), 'hub', 'above');
+const $ = id => document.getElementById(id);
+const pinEl = $('pin'), poutEl = $('pout'), lbDot = $('lbdot'), verEl = $('ver'), savesEl = $('saves'), logEl = $('log');
+const distEls = [1,2,3,4,5].map(n => $('d'+n));
+
+/* ───────── simulation (same logic as the 2D original) ───────── */
+let simT = 0, paused = reduceMotion;
+const queue = [];
+function after(d, fn){ queue.push({t:simT + d, fn}); }
+const movers = [], trails = [];
+const linear = t => t, quadInOut = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+function move(obj, curve, dur, ease, orient, done, tick){ movers.push({obj, curve, dur, ease, orient, done, tick, t:0}); }
+
+const SPEED = 9;
+const ROUTING = { s1:[0,1,2,3,4], s2:[2,3,4,0,1] };
+const routeIdx = { s1:0, s2:0 };
+let pktIn = 0, pktOut = 0; const distCounts = [0,0,0,0,0];
+let mlVersion = 0, mlSaves = 0;
+
+const pktGeo = new THREE.BoxGeometry(.22, .16, .42), pool = [];
+function getPacket(color){
+  let p = pool.pop();
+  if (!p){ const g = new THREE.Group(); const m = new THREE.Mesh(pktGeo, basic(0xffffff)); const h = glow(0xffffff, 1.0, .55); g.add(m, h); p = {g, m, h}; }
+  p.m.material.color.copy(color); p.h.material.color.copy(color); scene.add(p.g); return p;
+}
+function releasePacket(p){ scene.remove(p.g); pool.push(p); }
+
+function journey(sid, wi, delay){
+  after(delay, () => {
+    const s = SENDERS[sid], w = workers[wi], p = getPacket(s.color);
+    move(p.g, s.curve, s.len/SPEED, linear, true, () => {
+      pktIn++; flashLB(); updateLB();
+      move(p.g, w.curve, w.len/SPEED, linear, true, () => {
+        pktOut++; distCounts[wi]++; updateLB();
+        w.level = Math.min(100, w.level + 9 + Math.random()*5); w.flash = 1;
+        releasePacket(p);
+      });
+    });
+  });
+}
+function spawnTrain(sid){
+  const n = 5 + Math.floor(Math.random()*5), list = ROUTING[sid];
+  const wi = list[(routeIdx[sid]++) % list.length];
+  SENDERS[sid].flash = 1;
+  for (let i = 0; i < n; i++) journey(sid, wi, i*.11);
+}
+function scheduleSender(sid, first, interval){
+  const go = d => after(d, () => { spawnTrain(sid); go(interval + (Math.random() - .5)*.3); });
+  go(first);
+}
+function updateLB(){
+  pinEl.textContent = pktIn; poutEl.textContent = pktOut;
+  const total = distCounts.reduce((a,b)=>a+b, 0); if (!total) return;
+  distCounts.forEach((c,i) => distEls[i].style.width = (c/total*100).toFixed(1) + '%');
+}
+function flashLB(){ lbFlash = 1; lbDot.classList.add('hot'); clearTimeout(flashLB.t); flashLB.t = setTimeout(() => lbDot.classList.remove('hot'), 160); }
+
+const readyGeo = new THREE.TorusGeometry(.13, .028, 6, 24), readyPool = [];
+function readySignal(w){
+  const m = readyPool.pop() || new THREE.Mesh(readyGeo, basic(COL.ready, {transparent:true, opacity:.7}));
+  m.userData.billboard = true; scene.add(m);
+  move(m, w.rCurve, w.rLen/(SPEED*.75), linear, false, () => { scene.remove(m); readyPool.push(m); });
+}
+function scheduleReady(w, delay){ after(delay, () => { readySignal(w); scheduleReady(w, 1.2 + Math.random()*.9); }); }
+
+const saveLog = [];
+function snapshot(w){
+  const g = new THREE.Group();
+  g.add(glow(COL.snap, 1.5, .6), new THREE.Mesh(PAGE_GEO, basic(COL.snap, {map:PAGE_TEX, transparent:true, depthWrite:false})));
+  g.userData.billboard = true; g.position.copy(w.save.v0); scene.add(g);
+  const tag = addLabel(`W${w.i+1} checkpoint`, g.position, 'tag', 'right');
+  let acc = 0;
+  move(g, w.save, 1.3, quadInOut, false, () => {
+    scene.remove(g); removeLabel(tag);
+    mlSaves++; if (mlSaves % 3 === 0){ mlVersion++; versionPulse(); }
+    savesEl.textContent = mlSaves; verEl.textContent = 'v' + mlVersion;
+    saveLog.unshift(`<span><i>#${mlSaves}</i><i>Worker ${w.i+1}</i><i>v${mlVersion}</i></span>`); saveLog.length = Math.min(saveLog.length, 3);
+    logEl.innerHTML = saveLog.join('');
+    hubFlash = 1; hubEl.classList.add('flash'); clearTimeout(snapshot.t); snapshot.t = setTimeout(() => hubEl.classList.remove('flash'), 450);
+  }, dt => {
+    acc += dt;
+    while (acc > .035){ acc -= .035; const s = glow(COL.snap, .55, .5); s.position.copy(g.position); scene.add(s); trails.push({s, t:0}); }
+  });
+}
+function versionPulse(){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(1.25, .04, 6, 64), basic(COL.snap, {transparent:true, opacity:.9, depthWrite:false}));
+  m.rotation.x = Math.PI/2; m.position.copy(REG).add(new V3(0, 1.1, 0)); scene.add(m); pulses.push({m, t:0});
+}
+function scheduleSnapshots(){
+  workers.forEach((w, i) => {
+    const go = d => { w.ck.prev = simT; w.ck.next = simT + d; after(d, () => { snapshot(w); go(3.5 + Math.random()*3); }); };
+    go(2.0 + i*.7 + Math.random());
+  });
+}
+
+scheduleSender('s1', .2, 2.0);
+scheduleSender('s2', .9, 2.2);
+workers.forEach((w, i) => scheduleReady(w, .5 + i*.4));
+scheduleSnapshots();
+
+/* ───────── camera: presets + drag orbit ───────── */
+const D = Math.PI/180;
+const PRESETS = {
+  overview:{ land:{target:new V3(-1.5,.4,3.2), theta:0, phi:48*D, r:39}, port:{target:new V3(-1,.4,0), theta:90*D, phi:38*D, r:40} },
+  lb:      { land:{target:new V3(-13.5,1,0), theta:-12*D, phi:55*D, r:19}, port:{target:new V3(-13.5,1,0), theta:-12*D, phi:50*D, r:20} },
+  ring:    { land:{target:new V3(4.6,.6,1.2), theta:16*D, phi:46*D, r:28}, port:{target:new V3(4.6,.6,0), theta:16*D, phi:40*D, r:26} },
+  reg:     { land:{target:new V3(11,1,0), theta:-22*D, phi:52*D, r:18}, port:{target:new V3(11,1,0), theta:-22*D, phi:48*D, r:20} },
+};
+const cam = {target:new V3(), theta:0, phi:1, r:28};
+let tween = null, currentView = 'overview', userMoved = false;
+function presetFor(name){
+  const a = camera.aspect, p = a >= 1 ? PRESETS[name].land : PRESETS[name].port;
+  let r = p.r;
+  if (a >= 1) r *= Math.pow(Math.max(1, (16/9)/a), .85);
+  else r *= Math.pow(Math.max(1, .62/a), .6) * (name === 'overview' ? 1 : 1.5);
+  return {target:p.target.clone(), theta:p.theta, phi:p.phi, r};
+}
+function goTo(name, instant){
+  currentView = name; userMoved = false;
+  document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === name)));
+  const to = presetFor(name);
+  if (instant || reduceMotion){ Object.assign(cam, to); tween = null; return; }
+  let dTheta = to.theta - cam.theta; dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+  tween = {from:{target:cam.target.clone(), theta:cam.theta, phi:cam.phi, r:cam.r}, to:Object.assign(to, {theta:cam.theta + dTheta}), t:0};
+}
+function applyCam(){
+  const s = Math.sin(cam.phi);
+  camera.position.set(cam.target.x + cam.r*s*Math.sin(cam.theta), cam.target.y + cam.r*Math.cos(cam.phi), cam.target.z + cam.r*s*Math.cos(cam.theta));
+  camera.lookAt(cam.target);
+}
+const pointers = new Map(); let pinchD = 0;
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, {x:e.clientX, y:e.clientY}); tween = null; });
+canvas.addEventListener('pointermove', e => {
+  const prev = pointers.get(e.pointerId); if (!prev) return;
+  const cur = {x:e.clientX, y:e.clientY}; pointers.set(e.pointerId, cur);
+  if (pointers.size === 1){
+    cam.theta -= (cur.x - prev.x)*.006;
+    cam.phi = Math.min(1.45, Math.max(.18, cam.phi - (cur.y - prev.y)*.005));
+  } else if (pointers.size === 2){
+    const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchD) cam.r = Math.min(80, Math.max(7, cam.r * pinchD / d));
+    pinchD = d;
+  }
+  userMoved = true; markCustom();
+});
+const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinchD = 0; };
+canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('wheel', e => { e.preventDefault(); tween = null; cam.r = Math.min(80, Math.max(7, cam.r*(1 + e.deltaY*.001))); userMoved = true; markCustom(); }, {passive:false});
+function markCustom(){ document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', 'false')); }
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.view)));
+
+const ppBtn = $('playpause');
+function syncPP(){ ppBtn.textContent = paused ? 'Play' : 'Pause'; ppBtn.setAttribute('aria-pressed', String(paused)); }
+ppBtn.addEventListener('click', () => { paused = !paused; syncPP(); });
+syncPP();
+
+const app = $('app');
+function resize(){
+  const w = app.clientWidth, h = app.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+  if (!userMoved) goTo(currentView, true);
+}
+addEventListener('resize', resize); resize();
+
+/* ───────── frame loop ───────── */
+const clockEl = $('clock'), tmp = new V3(), tan = new V3(), WHITE = new THREE.Color(0xffffff);
+const bufColor = lv => lv > 80 ? COL.crit : lv > 50 ? COL.warn : COL.buf;
+const bufVar = lv => lv > 80 ? 'var(--crit)' : lv > 50 ? 'var(--warn)' : 'var(--buf)';
+let drainAcc = 0, last = performance.now();
+
+function step(dt){
+  simT += dt;
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].t <= simT){ const e = queue[i]; queue.splice(i, 1); e.fn(); }
+  for (let i = movers.length - 1; i >= 0; i--){
+    const m = movers[i]; m.t += dt/m.dur;
+    const u = m.ease(Math.min(1, m.t));
+    m.curve.getPointAt(u, m.obj.position);
+    if (m.orient){ m.curve.getTangentAt(u, tan); m.obj.lookAt(tmp.copy(m.obj.position).add(tan)); }
+    if (m.tick) m.tick(dt);
+    if (m.t >= 1){ movers.splice(i, 1); m.done && m.done(); }
+  }
+  drainAcc += dt;
+  while (drainAcc >= .35){ drainAcc -= .35; workers.forEach(w => { w.level = Math.max(0, w.level - 1.6); }); }
+  diamonds.forEach(d => {
+    ringCurve.getPointAt(((simT/RING_PERIOD + d.phase) % 1 + 1) % 1, d.g.position);
+    d.m.rotation.y += dt*2.4;
+  });
+  stack.rotation.y += dt*.25;
+  clockEl.textContent = `t=${simT.toFixed(1)}s`;
+}
+
+function decay(dt){
+  lbFlash *= Math.exp(-dt*6); hubFlash *= Math.exp(-dt*3);
+  lidMat.emissiveIntensity = lbFlash*.6; lbHalo.material.opacity = .08 + lbFlash*.45;
+  hubRims.forEach(r => r.material.color.copy(COL.snap).lerp(WHITE, hubFlash*.6));
+  hubHalo.material.opacity = .12 + hubFlash*.35;
+  Object.values(SENDERS).forEach(s => {
+    s.flash *= Math.exp(-dt*4);
+    s.halo.material.opacity = .25 + s.flash*.6;
+    s.ports.forEach(p => p.material.color.copy(s.color).lerp(WHITE, s.flash*.5));
+  });
+  workers.forEach(w => {
+    w.flash *= Math.exp(-dt*8);
+    w.edges.material.color.copy(COL.worker).lerp(COL.s1, w.flash);
+    w.shown += (w.level - w.shown)*Math.min(1, dt*10);
+    w.fill.scale.x = Math.max(.001, w.shown/100*2.2);
+    w.fill.material.color.copy(bufColor(w.level));
+    w.barEl.style.width = w.shown.toFixed(1) + '%';
+    w.barEl.style.background = bufVar(w.level);
+    w.pctEl.textContent = Math.round(w.level) + '%';
+    w.pctEl.style.color = bufVar(w.level);
+    const p = Math.min(1, Math.max(0, (simT - w.ck.prev)/(w.ck.next - w.ck.prev)));
+    const s = .4 + .6*p; w.page.scale.set(s, s, s);
+    w.pageMesh.material.opacity = .25 + .7*p;
+    w.pageGlow.material.opacity = p > .75 ? (p - .75)*2.4 : 0;
+    w.ckBar.style.width = (p*100).toFixed(1) + '%';
+    w.ckPct.textContent = Math.round(p*100) + '%';
+    w.flowTex.offset.x -= dt*1.1;
+  });
+  for (let i = trails.length - 1; i >= 0; i--){
+    const tr = trails[i]; tr.t += dt; tr.s.material.opacity = .5*(1 - tr.t/.45);
+    if (tr.t >= .45){ scene.remove(tr.s); tr.s.material.dispose(); trails.splice(i, 1); }
+  }
+  for (let i = pulses.length - 1; i >= 0; i--){
+    const p = pulses[i]; p.t += dt;
+    const s = 1 + p.t*1.4; p.m.scale.set(s, s, s); p.m.material.opacity = Math.max(0, .9 - p.t*.9);
+    if (p.t > 1){ scene.remove(p.m); p.m.geometry.dispose(); pulses.splice(i, 1); }
+  }
+}
+
+function placeLabels(){
+  const w = app.clientWidth, h = app.clientHeight;
+  labels.forEach(L => {
+    tmp.copy(L.anchor).project(camera);
+    if (tmp.z > 1 || tmp.z < -1){ L.el.hidden = true; return; }
+    L.el.hidden = false;
+    const x = (tmp.x*.5 + .5)*w, y = (-tmp.y*.5 + .5)*h;
+    const t = L.align === 'right' ? 'translate(10px,-50%)' : L.align === 'left' ? 'translate(calc(-100% - 10px),-50%)' : L.align === 'below' ? 'translate(-50%,10px)' : 'translate(-50%,calc(-100% - 8px))';
+    L.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) ${t}`;
+  });
+}
+
+function frame(now){
+  const dt = Math.min(.05, (now - last)/1000); last = now;
+  if (tween){
+    tween.t = Math.min(1, tween.t + dt/1.2); const e = quadInOut(tween.t);
+    cam.target.lerpVectors(tween.from.target, tween.to.target, e);
+    cam.theta = tween.from.theta + (tween.to.theta - tween.from.theta)*e;
+    cam.phi = tween.from.phi + (tween.to.phi - tween.from.phi)*e;
+    cam.r = tween.from.r + (tween.to.r - tween.from.r)*e;
+    if (tween.t >= 1) tween = null;
+  }
+  applyCam();
+  if (!paused) step(dt);
+  decay(paused ? 0 : dt);
+  scene.traverse(o => { if (o.userData.billboard) o.quaternion.copy(camera.quaternion); });
+  renderer.render(scene, camera);
+  placeLabels();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

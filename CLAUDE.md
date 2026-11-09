@@ -1,7 +1,7 @@
 # HAIDIS Animations — CLAUDE.md
 
 ## Project purpose
-Static HTML+SVG animations for HAIDIS project presentations, demos, and meetings. Designed to be screen-recorded at 16:9 (1440×810) or opened directly in a browser. No build step, no server required — open `index.html` directly in a browser.
+Static HTML animations for HAIDIS project presentations, demos, and meetings — 2D (SVG + GSAP) and 3D (Three.js) variants. Designed to be screen-recorded at 16:9 (1440×810) or opened directly in a browser. No build step, no server required — open `index.html` directly in a browser.
 
 ## Repository layout
 ```
@@ -10,25 +10,28 @@ animations/
   training-phase.html           ← Training topology: data senders → LB → workers → MLFlow
   pipeline-overview.html        ← Adaptive pipeline: 3-phase training data progression
   node-detail.html              ← Perlmutter node internals: ERSAP → SHMem → SAGIPS ranks · MPI ring · MLFlow
+  haidis-training-phase-3d.html ← Three.js variant of training-phase (dark theme, orbit camera)
+  haidis-pipeline-overview-3d.html ← Three.js variant of pipeline-overview (sled moves upstream, stages sink)
 plans/
   node-detail.md                ← Implementation plan for node-detail (phased)
+  pipeline-overview-3d.md       ← Implementation plan for haidis-pipeline-overview-3d
 README.md
 CLAUDE.md
 ```
 
 ## Tech stack
-- **SVG** for all layout and visual elements (viewBox 1440×810, 16:9)
-- **GSAP 3** (loaded from cdnjs CDN) for all JavaScript-driven animation
+- **2D animations**: **SVG** for all layout and visual elements (viewBox 1440×810, 16:9) + **GSAP 3** (cdnjs) for JavaScript-driven animation
+- **3D animations** (`*-3d.html`): **Three.js r128** (cdnjs), no GSAP — see "3D animation conventions" below
 - **Pure CSS** for the gallery page styling and card hover effects
 - **No build tool, no npm, no framework** — everything is a single self-contained HTML file
 
 ## Adding a new animation
 
-1. Create `animations/<phase-name>.html` following the conventions below.
-2. In `index.html`, replace the next `<div class="card placeholder">` block with a real `<a class="card" href="animations/<phase-name>.html">` card.
-3. Add a miniature static SVG thumbnail inside `.card-thumb` (viewBox 320×160, same topology layout, no GSAP).
+1. Create `animations/<phase-name>.html` following the conventions below (2D) or `animations/haidis-<phase-name>-3d.html` (3D).
+2. In `index.html`, add an `<a class="card" href="animations/<file>.html">` card to the grid (2D cards first, then 3D cards; use a `class="card placeholder"` block for planned-but-unbuilt animations).
+3. Add a miniature SVG thumbnail inside `.card-thumb` (viewBox 320×160, same topology layout, no GSAP). 3D cards use `class="card-thumb thumb-3d"`.
 
-## Animation file conventions
+## Animation file conventions (2D: SVG + GSAP)
 
 ### Canvas
 ```html
@@ -181,6 +184,22 @@ Bottom-left box showing all link types and packet colors. Use the same visual pr
 - All icons centered vertically on their text row (icon center-y = text baseline - ~4px)
 - For dense legends (8+ entries), use a 2-column layout: two icon+label groups per row, each column occupying half the box width
 
+## 3D animation conventions (`*-3d.html`)
+
+The 3D variants deliberately differ from the SVG conventions above. Copy the scaffolding from an existing 3D file rather than starting fresh.
+
+- **Stack**: Three.js **r128** from cdnjs (`three.min.js`), single self-contained file, **no GSAP**. Full-bleed `<canvas id="scene">` (not letterboxed); HUD is HTML overlay.
+- **Theme**: dark instrument-room stage, tokens in `:root` and read into `COL` via `getComputedStyle` (`--bg #0c1524`, `--panel`, `--line`, `--fg`, `--muted`). Brightened palette for emissive readability: S1/SAGIPS `#22b8e8`, S2/Cal `#ff7a3d`, LB/Intermediate `#e2b13c`, workers/Add'l analysis `#7ea2d6`, MLFlow/AI-ready `#2fd48a`, ring/HAIDIS `#b65ae6`, raw `#ee4b5c`.
+- **Fonts**: Barlow Semi Condensed (display) + IBM Plex Mono (readouts) from Google Fonts. Canvas-texture text must redraw after `document.fonts.load(...)` resolves.
+- **Readouts**: HTML `.lbl` panels anchored to 3D points and re-projected every frame (`addLabel(html, anchor, cls, align, cssVar)` + `placeLabels()`). Anchors may be a `Vector3` or an `Object3D` (follows moving groups). `.sec` lines hide below 720 px.
+- **Time**: a pausable sim clock (`simT`) drives everything — `after(delay, fn, tag)` scheduler, `move()` curve movers, `anim()/tw()/keys()` value tweens. `step(dt)` advances logic, `decay(dt)` eases flashes, `pose()` sets idle motion from `simT`. Pause = stop calling `step`. Tag choreography (`'chor'`) so `cancelTag` can reset it (phase jumps).
+- **Camera**: named presets with landscape/portrait variants, drag-orbit + wheel/pinch zoom, 1.2 s tween between presets; `userMoved` suppresses auto-reframing on resize. View buttons + Pause in the top-right HUD.
+- **Shapes**: reuse 2D SVG polygons by scaling (`K = 1/50`) and extruding (`svgShape` → `ExtrudeGeometry`, rotated so SVG y → world +z).
+- **Accessibility**: `prefers-reduced-motion` starts paused with instant camera moves; canvas has a descriptive `aria-label`.
+- **URL params** (pipeline-overview-3d): `?phase=1|2|3`, `?nodelay`, `?view=overview|detector|pipeline|training`, `?seek=<s>`.
+- **Gallery thumbnail**: `.card-thumb.thumb-3d` (dark `#0c1524`), pseudo-isometric blocks (front rect + lighter top parallelogram + darker side face) in the 3D palette, `card-tag` "3D · Three.js · interactive", "3D <NAME>" corner tag at top-left. Prefix SVG `id`s per card (e.g. `tp3d-`, `pov3d-`) — all thumbnails share one document.
+- **Verifying without a browser**: `node --check` on the extracted inline `<script>` catches syntax errors; `rsvg-convert` renders gallery thumbnails to PNG (static frame only — SMIL motion is not evaluated).
+
 ## HAIDIS system components reference
 | Element | Real system |
 |---|---|
@@ -215,3 +234,5 @@ Bottom-left box showing all link types and packet colors. Use the same visual pr
 - Badge colors: LIVE = green (`#e8f4ee` / `#1a6040`), PENDING = grey
 - Placeholder cards: `class="card placeholder"` with `opacity:0.5; pointer-events:none`
 - Thumbnail SVG: viewBox `0 0 320 160`, same color palette, no GSAP. SMIL declarative animation (`<animateTransform>`, `<animate>`) is fine for packet motion and ring diamonds — use the opacity trick to hide the return trip: `values="0.85;0.85;0;0;0.85"` with matching `keyTimes`
+- For curved paths, `<animateMotion path="…">` (or `<mpath href="#id"/>` to reuse a drawn path) is simpler than translate keyframes; `keyPoints="0;1;1" keyTimes="0;0.4;1" calcMode="linear"` plus a matching opacity animation gives a travel-then-hide cycle
+- 3D animation cards follow the 2D cards and use the dark `.thumb-3d` thumbnail style (see 3D conventions)
